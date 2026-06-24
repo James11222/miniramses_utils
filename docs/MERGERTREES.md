@@ -86,12 +86,21 @@ import mergertrees as mt
 # generate tracks from simulation
 tracks = mk.mk_track(100, n_cores=8, bins=1)     # follow every tracked object, snaps 1..100
 
-fig, ax = plt.subplots(1,1, figsize=(6, 12))
-mt.plot_merger_tree(tracks, ax=ax, title=None, color_by='k')
+N = 3
+fig, axes = plt.subplots(1,N, figsize=(6*N, 12))
+
+ax = axes[0] 
+mt.plot_merger_tree(tracks, ax=ax, info=info, color_by='k', title=None, show_redshift=False)
+
+ax = axes[1]
+mt.plot_merger_tree(tracks, ax=ax, info=info, color_by='column', labels=True, title=None, show_redshift=False)
+
+ax = axes[2]
+_,_,cbar = mt.plot_merger_tree(tracks, ax=ax, info=info, color_by='r200', norm='linear', title=None, show_redshift=True)
 ```
 
 <p align="center">
-  <img width="400" alt="image" src="https://github.com/user-attachments/assets/14f04895-045b-492b-ba6b-a1bdf7285368" />
+  <img width="1595" height="1064" alt="image" src="https://github.com/user-attachments/assets/90db4b11-e493-4998-8969-603370ad870b" />
 </p>
 
 
