@@ -419,8 +419,10 @@ class MergerTree:
         if ax is None:
             figsize = kwargs.get("figsize", self._auto_figsize())
             fig, ax = plt.subplots(figsize=figsize)
+            owns_fig = True
         else:
             fig = ax.figure
+            owns_fig = False
 
         # ---- field colour setup (shared scalar mappable + colorbar) ---------
         smap = None
@@ -446,24 +448,90 @@ class MergerTree:
 
         ax2 = self._style_axes(ax, kwargs, show_redshift)
 
-        # Lay out the main axes first; tight_layout can warn harmlessly when a
-        # twin axis is present, so silence that one warning.
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            fig.tight_layout()
+        # Only lay out the figure when we created it. When the caller supplies an
+        # axes (e.g. one panel of a multi-subplot figure) the layout is theirs to
+        # manage -- calling tight_layout here would fight their arrangement and
+        # resize the sibling panels. tight_layout can warn harmlessly when a twin
+        # axis is present, so silence that one warning.
+        if owns_fig:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                fig.tight_layout()
 
         if smap is not None:
-            # Add the colorbar *after* tight_layout so its stolen space sticks:
-            # a horizontal bar along the bottom, flush with the plot, where it
-            # never competes with the snapshot / redshift y-axes.
-            fs = self._fontsizes(fig)
-            cbar_axes = [ax, ax2] if ax2 is not None else ax
-            cb = fig.colorbar(smap, ax=cbar_axes, orientation="horizontal",
-                              fraction=0.035, pad=-0.01, aspect=10)
-            cb.set_label(clabel, fontsize=fs["label"])
-            cb.ax.tick_params(labelsize=fs["tick"])
-        return fig, ax
+            cb = self._add_field_colorbar(fig, ax, ax2, smap, clabel, owns_fig)
+            return fig, ax, cb
+
+        return fig, ax, None
+
+    def _add_field_colorbar(self, fig, ax, ax2, smap, clabel, owns_fig):
+        """Pin a horizontal colorbar beneath the plot, robust to figure size.
+
+        Rather than letting matplotlib steal space (whose thickness/aspect drift
+        as the figure is resized), the colorbar axes is given a *locator* that
+        positions it from the main axes' live geometry on every draw:
+
+        * its **width** matches the main axes exactly, so the bar's left/right
+          edges stay flush with the left (snapshot) and right (redshift) y-axes;
+        * its **thickness** and the gap above it are defined in *inches*, so they
+          stay constant whatever the figure size or aspect ratio;
+        * it hangs just under the x-axis with a small, nearly-flush pad, and -
+          because the locator re-reads the axes position each draw - it keeps
+          tracking the plot through later ``tight_layout`` calls or resizes.
+
+        When we own the figure (single axes) the axes is shrunk upward first so
+        the bar and its labels are guaranteed to fit inside the figure. When the
+        caller supplies the axes (a panel in a multi-subplot figure) the axes is
+        left untouched - it stays the same size as its siblings and the bar simply
+        hangs below it, into the figure's bottom margin.
+        """
+        fs = self._fontsizes(fig)
+        _, fig_h = fig.get_size_inches()
+
+        # Geometry in inches (constant across figure sizes); the locator converts
+        # to figure fraction at draw time using the then-current figure height.
+        bar_in = float(np.clip(fs["label"] / 72.0 * 1.1, 0.25, 0.6))  # thickness
+        pad_in = 0.12                                                 # axes->bar gap
+        # Room beneath the bar for its tick labels + axis label, scaled to the
+        # (figure-dependent) font sizes so big, tall trees still leave enough.
+        label_in = 0.16 + (fs["tick"] + fs["label"]) / 72.0 * 1.7
+
+        if owns_fig:
+            # Shrink the (single) plot upward, top fixed, to free a bottom strip.
+            pos = ax.get_position()
+            reserve = (pad_in + bar_in + label_in) / fig_h
+            new_box = [pos.x0, pos.y0 + reserve, pos.width, pos.height - reserve]
+            ax.set_position(new_box)
+            if ax2 is not None:
+                ax2.set_position(new_box)
+
+        cax = fig.add_axes([0, 0, 1, 1])  # placeholder; the locator drives it
+        cax.set_axes_locator(self._cbar_locator(ax, bar_in, pad_in))
+        cb = fig.colorbar(smap, cax=cax, orientation="horizontal")
+        cb.set_label(clabel, fontsize=fs["label"])
+        cb.ax.tick_params(labelsize=fs["tick"])
+        return cb
+
+    @staticmethod
+    def _cbar_locator(parent, bar_in, pad_in):
+        """Locator that hangs a colorbar axes below ``parent``, flush and fixed.
+
+        Returns a callable ``(cax, renderer) -> Bbox`` (figure-fraction) that
+        matplotlib invokes each draw, so the bar follows the parent axes if the
+        figure is resized or re-laid-out, always a constant ``bar_in`` inches
+        thick and ``pad_in`` inches below the axes, spanning its full width.
+        """
+        from matplotlib.transforms import Bbox
+
+        def _locate(cax, renderer):
+            _, fig_h = parent.figure.get_size_inches()
+            p = parent.get_position()
+            bar_h = bar_in / fig_h
+            pad_h = pad_in / fig_h
+            return Bbox.from_bounds(p.x0, p.y0 - pad_h - bar_h, p.width, bar_h)
+
+        return _locate
 
     # --------------------------------------------------------- drawing helpers
     def _draw_branch(self, ax, node, color_by, labels, marker_size, lw, smap):
