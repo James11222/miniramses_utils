@@ -56,6 +56,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from collections import defaultdict
+import astropy.units as u
 
 
 # =============================================================================
@@ -378,7 +379,7 @@ class MergerTree:
             'column'  - each branch gets its own colour (structure view);
             'black'   - plain black tree, like the RAMSES esthetic figure;
             <field>   - any per-snapshot field in ``tracks`` ('mass', 'vmax',
-                        'r200', 'c200', ...): node dots are coloured by that
+                        'r200', 'c200', 'm200', ...): node dots are coloured by that
                         field's value with a colorbar (the MINI-RAMSES extension).
         labels : bool, default False
             Draw the ``birth_id`` in a coloured box at each node instead of a dot.
@@ -603,15 +604,35 @@ class MergerTree:
 
     def _field_conversion(self, field):
         """Code-unit -> physical conversion factor and a colorbar label."""
-        if self.info is not None and field == "mass":
-            conv = (self.info.unit_d * self.info.unit_l ** 3) / 2e33 # cgs to Msun
-            return conv, r"$M_{\rm 200c}\;[\mathrm{M}_\odot]$"
-        if self.info is not None and field == "r200":
-            conv = self.info.unit_l * 3.24078e-25 # cgs to kpc
-            return conv, r"$r_{\rm 200c}\;[\mathrm{kpc}]$"
+
+        if self.info is not None:
+            try:
+                # Check to see if units were used in info object, if not warn the user and use code units instead.
+                if field == "mass":
+                    conv = self.info.unit_m.to(u.Msun).value * self.info.h # cgs to Msun/h
+                    return conv, r"$M_{\rm clump}\;[\mathrm{M}_\odot/h]$"
+                if field == "m200":
+                    conv = self.info.unit_m.to(u.Msun).value * self.info.h # cgs to Msun/h
+                    return conv, r"$M_{\rm 200c}\;[\mathrm{M}_\odot/h]$"
+                if field == "r200":
+                    conv = self.info.unit_l.to(u.kpc).value * self.info.h # cgs to kpc/h
+                    return conv, r"$r_{\rm 200c}\;[\mathrm{kpc}/h]$"
+                    
+            except AttributeError:
+                import warnings
+                warnings.warn(
+                    "Please set units=True when loading info with miniramses.py to get physical units"
+                    "using code units for now.",
+                    stacklevel=3,
+                )
+            
         labels = {"vmax": r"$V_{\max}$ [code units]",
                   "r200": r"$r_{\rm 200c}$ [code units]",
-                  "c200": r"$c_{\rm 200c}$", "mass": r"$M_{\rm 200c}$ [code units]"}
+                  "c200": r"$c_{\rm 200c}$", 
+                  "mass": r"$M_{\rm clump}$ [code units]",
+                  "m200": r"$M_{\rm 200c}$ [code units]"
+                 }
+                  
         return 1.0, labels.get(field, field)
 
     # ------------------------------------------------------------- axis style

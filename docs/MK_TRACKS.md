@@ -68,8 +68,9 @@ shape `(ngal, nsnapshots)` — one row per tracked object, one column per snapsh
 | `aexp`, `texp` | expansion factor and proper time at each snapshot |
 | `x`, `y`, `z` | Cartesian positions |
 | `vx`, `vy`, `vz` | Cartesian velocities |
-| `mass` | halo mass (smoothed unless `bins=1`) |
+| `mass` | clump mass (smoothed unless `bins=1`) |
 | `mpatch` | patch mass |
+| `m200` | M200c, the NFW mass within `r200` |
 | `r200`, `c200`, `rmax`, `vmax` | virial radius, concentration, radius of max circular velocity, and max circular velocity |
 | `peak_id` | associated density-peak ID |
 | `pop` | population type: `1` central, `2` most-massive central, `3` satellite, `4` orphan |

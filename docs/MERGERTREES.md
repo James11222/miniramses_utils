@@ -47,7 +47,9 @@ fig, ax = mt.plot_merger_tree(tracks, root=None, info=None, ax=None, **plot_kwar
 - `root` — `birth_id` of the root halo. Omit it to auto-select the most massive
   halo that survives (never merges) to the final snapshot.
 - `info` — a `miniramses.Info`, needed only for physical-unit colourbars
-  (`mass` → M⊙, `r200` → kpc).
+  (`mass`/`m200` → M⊙/h, `r200` → kpc/h). Load it with `units=True`
+  (`ram.rd_info(snapshot, units=True)`); otherwise the colourbars fall back to
+  code units.
 - `**plot_kwargs` — forwarded to `MergerTree.plot` (see below).
 
 ### Object oriented
@@ -65,13 +67,13 @@ Useful attributes: `tree.root_id`, `tree.nodes` (list of `Branch`),
 
 | kwarg | default | meaning |
 |-------|---------|---------|
-| `color_by` | `'column'` | `'column'` = one colour per branch (structure view); `'black'` = plain black tree (the RAMSES esthetic figure); or **any per-snapshot field in `tracks`** (`'mass'`, `'vmax'`, `'r200'`, `'c200'`, …) to colour the node dots by that field with a colourbar. |
+| `color_by` | `'column'` | `'column'` = one colour per branch (structure view); `'black'` = plain black tree (the RAMSES esthetic figure); or **any per-snapshot field in `tracks`** (`'mass'`, `'m200'`, `'vmax'`, `'r200'`, `'c200'`, …) to colour the node dots by that field with a colourbar. |
 | `labels` | `False` | label the bottom of each branch with its `birth_id` in the same color as the branch. |
 | `marker_size` | `6` | dot size (points) when `labels=False`. |
 | `linewidth` | `1.6` | width of branch spines and merger connectors. |
 | `cmap` | `'viridis'` | colormap for field colouring. |
 | `norm` | `'log'` | `'log'` or `'linear'` colour normalisation. |
-| `vmin`, `vmax` | auto | colour limits in **code units**. |
+| `vmin`, `vmax` | auto | colour limits, in the same units as the colourbar (physical when `info` is supplied, else code units). |
 | `show_redshift` | `True` | add the right-hand redshift axis (uses `aexp` from `tracks`). |
 | `title` | auto | plot title, can be set to `None` |
 | `figsize` | auto | override the automatic figure size. |

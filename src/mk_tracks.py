@@ -45,6 +45,31 @@ def f(x):
     """
     return np.log(1 + x) - x / (1 + x)
 
+def compute_M200(r200, c200, info):
+    """
+    Compute M200c for an NFW halo.
+
+    Parameters
+    ----------
+    r200 : float or array-like
+        r200c (where density = 200 * critical density) [code units]
+    c200 : float or array-like
+        Concentration parameter for c200c (r200c / rs)
+    info : miniramses.Info
+        Info object containing cosmological parameters
+
+    Returns
+    -------
+    float or array-like
+        M200c mass [code units]
+    """
+
+    rho_m = 1.0 # Mean matter density in code units 
+    omega_mz = info.omega_m * info.aexp**(-3) / (info.omega_m * info.aexp**(-3) + info.omega_l)
+    d200c = 200 / omega_mz  # 200 times the critical density
+    
+    M200 = (4 * np.pi / 3) * r200**3 * d200c * rho_m
+    return M200
 
 def compute_vmax(r200, c200, rmax, info):
     """
@@ -194,6 +219,7 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
     vmax_snap = np.zeros(ngal)
     mass_snap = np.zeros(ngal)
     mpatch_snap = np.zeros(ngal)
+    m200_snap = np.zeros(ngal)
     x_snap = np.zeros(ngal)
     y_snap = np.zeros(ngal)
     z_snap = np.zeros(ngal)
@@ -279,6 +305,12 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
                     info
                 ) * (10 ** np.random.normal(0, sigma))
 
+                m200_snap[igal] = compute_M200(
+                    cc.r200[ipeak],
+                    cc.c200[ipeak],
+                    info
+                )
+
             # Classify population type
             is_most_massive_central = (cc.index[ipeak] == cc.parent[ipeak]) and \
                                      (cc.index[ipeak] == cc.halo[ipeak])
@@ -301,7 +333,7 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
         'iout': iout,
         'aexp': aexp_snap, 'texp': texp_snap,
         'r200': r200_snap, 'c200': c200_snap, 'rmax': rmax_snap, 'vmax': vmax_snap,
-        'mass': mass_snap, 'mpatch': mpatch_snap,
+        'mass': mass_snap, 'mpatch': mpatch_snap, 'm200': m200_snap,
         'x': x_snap, 'y': y_snap, 'z': z_snap,
         'vx': vx_snap, 'vy': vy_snap, 'vz': vz_snap,
         'peak': peak_snap, 'pop': pop_snap, 'merge': merge_snap,
@@ -414,6 +446,7 @@ def mk_track(snapshot, **kwargs):
     vmax = np.zeros((ngal, snapshot))
     mass = np.zeros((ngal, snapshot))
     mpatch = np.zeros((ngal, snapshot))
+    m200 = np.zeros((ngal, snapshot))
     x = np.zeros((ngal, snapshot))
     y = np.zeros((ngal, snapshot))
     z = np.zeros((ngal, snapshot))
@@ -475,6 +508,7 @@ def mk_track(snapshot, **kwargs):
             vmax[:, iloop] = result['vmax']
             mass[:, iloop] = result['mass']
             mpatch[:, iloop] = result['mpatch']
+            m200[:, iloop] = result['m200']
             x[:, iloop] = result['x']
             y[:, iloop] = result['y']
             z[:, iloop] = result['z']
@@ -515,6 +549,7 @@ def mk_track(snapshot, **kwargs):
         "c200": c200,
         "mass": mass,
         "mpatch": mpatch,
+        "m200": m200,
         "x": x,
         "y": y,
         "z": z,
