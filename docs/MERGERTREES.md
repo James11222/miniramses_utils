@@ -1,11 +1,7 @@
 # `mergertrees.py` — Merger-tree diagrams for MINI-RAMSES
 
-An object-oriented re-implementation, for the MINI-RAMSES data format, of the
-merger-tree figure produced by the official RAMSES script
-`utils/py/mergertreeplot.py` (see `ramses_mergertrees/`). It turns the particle
-tracks built by `mk_tracks.mk_track` into a publication-style tree: vertical
-dot-chains for each halo, diagonal connectors at mergers, snapshot on the left
-axis and redshift on the right.
+An object-oriented re-implementation of the mergertree plotting scripts in RAMSES (found at `ramses/utils/py/mergertreeplot.py`), for the MINI-RAMSES data format. It turns the tree particle tracks built by `mk_tracks.py` into a publication-style tree: vertical
+dot-chains for each halo, diagonal connectors at mergers, snapshot on the left axis and redshift on the right (optional).
 
 ## Quick start
 
@@ -14,10 +10,8 @@ import miniramses as ram
 import mk_tracks as mk
 import mergertrees as mt
 
-tracks = mk.mk_track(100, n_cores=8, bins=1)  # follow every object, snaps 1..100
+tracks = mk.mk_track(100, n_cores=8, bins=1)   # follow every object, snaps 1..100 (no smoothing)
 info   = ram.rd_info(100)                      # cosmology / unit conversions
-# NB: bins=1 disables mass smoothing, which is required for correct merger times
-# (see "Notes & gotchas").
 
 # Simplest call — auto-pick the most massive surviving halo as the root:
 fig, ax = mt.plot_merger_tree(tracks, info=info)
@@ -41,7 +35,7 @@ python mergertrees.py 100 --color-by black --labels
 Arguments: `python mergertrees.py <snapshot> [root_birth_id]`
 with `--path`, `--ncores`, `--color-by`, `--labels`, `-o/--output`.
 
-## The API
+## The API within the script
 
 ### High level
 
@@ -72,16 +66,36 @@ Useful attributes: `tree.root_id`, `tree.nodes` (list of `Branch`),
 | kwarg | default | meaning |
 |-------|---------|---------|
 | `color_by` | `'column'` | `'column'` = one colour per branch (structure view); `'black'` = plain black tree (the RAMSES esthetic figure); or **any per-snapshot field in `tracks`** (`'mass'`, `'vmax'`, `'r200'`, `'c200'`, …) to colour the node dots by that field with a colourbar. |
-| `labels` | `False` | label each node with its `birth_id` in a coloured box instead of drawing a dot. |
+| `labels` | `False` | label the bottom of each branch with its `birth_id` in the same color as the branch. |
 | `marker_size` | `6` | dot size (points) when `labels=False`. |
 | `linewidth` | `1.6` | width of branch spines and merger connectors. |
 | `cmap` | `'viridis'` | colormap for field colouring. |
 | `norm` | `'log'` | `'log'` or `'linear'` colour normalisation. |
 | `vmin`, `vmax` | auto | colour limits in **code units**. |
 | `show_redshift` | `True` | add the right-hand redshift axis (uses `aexp` from `tracks`). |
-| `title` | auto | plot title. |
+| `title` | auto | plot title, can be set to `None` |
 | `figsize` | auto | override the automatic figure size. |
 
+
+## Example Output
+
+```python
+import mk_tracks as mk
+import mergertrees as mt
+
+# generate tracks from simulation
+tracks = mk.mk_track(100, n_cores=8, bins=1)     # follow every tracked object, snaps 1..100
+
+fig, ax = plt.subplots(1,1, figsize=(6, 12))
+mt.plot_merger_tree(tracks, ax=ax, title=None, color_by='k')
+```
+
+<p align="center">
+  <img width="400" alt="image" src="https://github.com/user-attachments/assets/14f04895-045b-492b-ba6b-a1bdf7285368" />
+</p>
+
+
+<!--
 ## How it works (and how it maps to the RAMSES script)
 
 MINI-RAMSES already follows each object continuously through time, so **one
@@ -103,6 +117,7 @@ five-phase layout from `ramses_mergertrees/mergertreeplot_guide.md`:
 5. **Render** — a vertical spine per branch, a diagonal connector per merger, a
    dot/label per node, and dual snapshot/redshift axes.
 
+
 | RAMSES (`mergertreeplot.py`) | here (`mergertrees.py`) |
 |------------------------------|-------------------------|
 | `_branch_x` | `Column` |
@@ -114,25 +129,4 @@ five-phase layout from `ramses_mergertrees/mergertreeplot_guide.md`:
 | `_draw_straight_lines` / `_draw_tree` | `MergerTree._draw_branch` / `_draw_connector` |
 | `_get_plotcolors` | `_column_color` |
 | `_tweak_treeplot` | `MergerTree._style_axes` |
-
-## Notes & gotchas
-
-- Indexing follows the project convention: row `i` of the `tracks` arrays is
-  `birth_id = i + 1`.
-- The root must be a *resolved* halo (it has `mass > 0` somewhere); passing a
-  `birth_id` that never forms a clump raises a `ValueError`.
-- In this DMO box the trees are small (the richest, halo 14, has 5 branches over
-  snapshots 36–100, z ≈ 1.76 → 0). The layout scales fine to far bushier trees.
-- Redshift ticks need `aexp` in `tracks` (always present from `mk_track`); `info`
-  is only required for the `mass`/`r200` physical-unit colourbars. Redshifts are
-  clamped at 0 (the final snapshot can have `aexp` slightly above 1).
-- The frame is centred horizontally on the surviving root, so the trunk sits in
-  the middle with progenitors splaying to both sides.
-- **Turn off mass smoothing when building tracks for a merger tree.** `mk_track`
-  *smooths* the mass history by default (its `bins` kwarg, default 10), which
-  bleeds mass into the post-merger snapshots, inflates an object's apparent
-  lifetime, and would report incorrect merger times. Build with smoothing off,
-  e.g. `mk.mk_track(100, bins=1)`. If a tree is built from smoothed tracks,
-  `MergerTree` emits a warning naming the affected branches (their connectors
-  would otherwise point backward in time). Smoothing is fine for other analyses;
-  it just must not be used for the tree.
+-->
