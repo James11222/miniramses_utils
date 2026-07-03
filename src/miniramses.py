@@ -5,6 +5,7 @@ from scipy.io import FortranFile
 from astropy.io import ascii
 import os
 import re
+import glob
 
 import time
 
@@ -1460,22 +1461,45 @@ def rd_info(nout,**kwargs):
 
     if units:
         import astropy.units as u
+        import astropy.constants as const
 
         # convert to physical units
         i.unit_l *= u.cm
         i.unit_d *= u.g / u.cm**3
         i.unit_t *= u.s
         i.unit_v *= u.cm / u.s
-        i.unit_m *= u.g
+        i.unit_m *= u.g 
         
         i.H0     *= u.km / u.s / u.Mpc
         i.boxlen *= i.unit_l
         i.time   *= i.unit_t 
         i.texp   *= i.unit_t
 
+        i.c = const.c.to(u.cm / u.s).value / i.unit_v.value # speed of light in code units
+        i.G = 3 / (8 * np.pi) * i.omega_m * i.aexp # gravitational constant in code units
+
 
     # Get the temperature conversion
     i.unit_T2 = ((i.unit_l / i.unit_t)**2) * 1.6605390e-24 / 1.3806490e-16
+
+    # Read all particle-type header files (*_header.txt) in the output
+    # directory and store the total number of particles of each type as an
+    # info attribute named "n"+prefix (e.g. part_header.txt -> i.npart,
+    # tree_header.txt -> i.ntree, peak_part_header.txt -> i.npeak_part).
+    # Non particle-type headers (e.g. grav_header.txt) are skipped.
+    outdir = os.path.dirname(filename)
+    i.nheader = {}
+    for header_file in sorted(glob.glob(os.path.join(outdir,"*_header.txt"))):
+        prefix = os.path.basename(header_file)[:-len("_header.txt")]
+        with open(header_file) as f:
+            lines = [line.strip() for line in f]
+        # only particle-type headers report a total particle count
+        if "Total number of particles" not in lines:
+            continue
+        idx = lines.index("Total number of particles")
+        nparticles = int(lines[idx+1])
+        setattr(i,"n"+prefix,nparticles)
+        i.nheader[prefix] = nparticles
 
     rd_rt_info = kwargs.get("rt",False)
     if rd_rt_info:
