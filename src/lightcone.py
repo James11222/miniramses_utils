@@ -69,6 +69,32 @@ class LightconeReader:
         return idp_data, real_data
 
     @staticmethod
+    def rd_positions(path, verbose=False):
+        """
+        Read only the particle positions (x, y, z) from a lightcone shell.
+
+        Seeks past the idp block instead of loading it (saves both the int32
+        array and the corresponding file I/O). The on-disk layout is idp
+        (int32, npart) followed by the float32 properties stored row-major, so
+        the first three property rows are x, y, z.
+
+        Returns:
+            positions: float32 array with shape (3, npart), rows x, y, z.
+        """
+        if verbose:
+            print(f"Reading positions from {path}")
+        txt_path = path + ".txt"
+        metadata = LightconeReader.rd_metadata(txt_path, verbose=verbose)
+        npart = metadata['npart']
+
+        with open(path, 'rb') as f:
+            f.seek(4 * npart)  # skip idp (int32 per particle)
+            real_data = np.frombuffer(f.read(4 * 3 * npart), dtype=np.float32)
+            real_data = real_data.reshape(3, npart)
+
+        return real_data
+
+    @staticmethod
     def rd_cell(path, nproperties=8, verbose=False):
         """
         Read the lightcone shell from the output directory.
@@ -101,34 +127,31 @@ class LightconeReader:
         Read the lightcone shell from the output directory and convert it to a Healpix map.
         nside: Healpix resolution parameter
         """
-        import healpy as hp
-        
-        # Read only the position data (properties x, y, z)
-        idp, properties = LightconeReader.rd_part(path, nproperties=3, verbose=verbose)
-        x, y, z = properties[0], properties[1], properties[2]  # x, y, z are the first 3 properties
-        
-        
-        # theta = np.pi/2 - np.arcsin(z / r)  # polar angle from x-axis
-        # phi = np.arcsin(y / r)    # azimuthal angle in y-z plane
-        # theta = np.pi/2 - np.arctan2(z, x)
+        # Read only the position data (x, y, z), seeking past idp.
+        properties = LightconeReader.rd_positions(path, verbose=verbose)
+        x, y, z = properties[0], properties[1], properties[2]
 
-        # Convert Cartesian coordinates to spherical coordinates
-        # x is the depth (cone axis), y and z are the transverse coordinates
+        # Convert Cartesian coordinates to spherical coordinates.
+        # x is the depth (cone axis), y and z are the transverse coordinates.
+        # Free intermediates as soon as they are dead so peak memory is a
+        # single map-sized (npix) array rather than several particle-sized ones.
         r = np.sqrt(x**2 + y**2 + z**2)
         theta = np.arccos(z / r)  # polar angle from x-axis
+        del r
         phi = np.arctan2(y, x)
-        
-        
-        # Create HEALPix map
-        npix = hp.nside2npix(nside)
-        healpix_map = np.zeros(npix)
-        
+        del properties, x, y, z
+
         # Convert spherical coordinates to HEALPix pixel indices
+        npix = hp.nside2npix(nside)
         pix_indices = hp.ang2pix(nside, theta, phi)
-        
-        # Count particles in each pixel
-        unique_pix, counts = np.unique(pix_indices, return_counts=True)
-        healpix_map[unique_pix] = counts
+        del theta, phi
+
+        # Count particles per pixel. bincount(minlength=npix) yields exactly the
+        # same per-pixel counts as np.unique(return_counts=True) + assignment,
+        # but without the O(npart) sort temporaries. Cast to float32 and drop
+        # the int64 counts immediately.
+        healpix_map = np.bincount(pix_indices, minlength=npix).astype(np.float32)
+        del pix_indices
 
         return healpix_map
 
@@ -265,20 +288,29 @@ class LightconeReader:
             The computed overdensity map as a HEALPix map.
         """
 
-        # compute the comoving distances in the shell
-        cosmo = LambdaCDM(info.H0, info.omega_m, info.omega_l)
-        shell['comoving_distance'] = cosmo.comoving_distance(shell['z_center']).value  / info.unit_l.to(u.Mpc).value
-        shell['comoving_width'] = (cosmo.comoving_distance(shell['z_old']) - cosmo.comoving_distance(shell['z'])).value / info.unit_l.to(u.Mpc).value
+        # Compute the comoving distances in the shell, but only if the caller
+        # (e.g. convergence_hp_map) has not already set them on the shell dict.
+        if 'comoving_distance' not in shell or 'comoving_width' not in shell:
+            cosmo = LambdaCDM(info.H0, info.omega_m, info.omega_l)
+            shell['comoving_distance'] = cosmo.comoving_distance(shell['z_center']).value  / info.unit_l.to(u.Mpc).value
+            shell['comoving_width'] = (cosmo.comoving_distance(shell['z_old']) - cosmo.comoving_distance(shell['z'])).value / info.unit_l.to(u.Mpc).value
 
         solid_angle_per_pix = (4 * np.pi / hp.nside2npix(nside)) # in steradians
-        hp_map_counts = LightconeReader.rd_positions_as_healpix(shell['part_file'], nside)
 
         # in code units
         rho_bar = 1.0
-        m_part = 1/info.npart
+        m_part = 1 / info.npart
 
-        rho = m_part * hp_map_counts / solid_angle_per_pix / shell['comoving_width'] / shell['comoving_distance']**2
-        overdensity = rho / rho_bar - 1.0 
+        # float32 per-pixel count map; fold rho = m_part*counts/dOmega/dchi/chi^2
+        # and overdensity = rho/rho_bar - 1 as in-place scalar ops so peak memory
+        # is a single npix-sized array (no full-size temporaries).
+        overdensity = LightconeReader.rd_positions_as_healpix(shell['part_file'], nside)
+        scale = np.float32(
+            m_part / solid_angle_per_pix
+            / shell['comoving_width'] / shell['comoving_distance']**2 / rho_bar
+        )
+        overdensity *= scale
+        overdensity -= np.float32(1.0)
 
         return overdensity
 
@@ -293,10 +325,15 @@ class LightconeReader:
         forked, so the module globals (overdensity_hp_map, info, np, hp) are
         inherited from the parent and don't need to be passed in.
         """
+        # overdensity_hp_map reuses the comoving distances that convergence_hp_map
+        # already set on the shell dict (no redundant cosmology recompute here).
         delta_k = LightconeReader.overdensity_hp_map(shell, nside, info)
         dchi_k, chi_k = shell['comoving_width'], shell['comoving_distance']
         a_k = shell['aexp_center']
-        return (delta_k / a_k) * dchi_k * chi_k * (chi_j - chi_k) / chi_j
+        # Fold the lensing-kernel factor in place on the float32 map.
+        kernel = np.float32(dchi_k * chi_k * (chi_j - chi_k) / chi_j / a_k)
+        delta_k *= kernel
+        return delta_k
 
     @staticmethod
     def convergence_hp_map(shells, nside, info, **kwargs):
@@ -322,10 +359,13 @@ class LightconeReader:
             The computed convergence map as a HEALPix map.
         """
 
-        from multiprocessing import Pool
+        import multiprocessing as mp
         from functools import partial
         from tqdm import tqdm
-        
+
+        # python 3.14+ have default forkserver (aka reimport everything, we just want fork here)
+        ctx = mp.get_context('fork')
+
         # compute the comoving distances in each shell
         cosmo = LambdaCDM(info.H0, info.omega_m, info.omega_l)
         for shell in shells:
@@ -337,12 +377,14 @@ class LightconeReader:
         if verbose := kwargs.get('verbose', True):
             print(f"Computing convergence map with nside={nside}, using {n_workers} processes")
 
-        kappa_map = np.zeros(hp.nside2npix(nside))
+        # float64 accumulator for precision; per-shell contributions arrive as
+        # float32 maps and are summed in here.
+        kappa_map = np.zeros(hp.nside2npix(nside), dtype=np.float64)
 
         chi_j = shells[-1]['comoving_distance'] # the comoving distance to the last shell in sequence
 
         worker = partial(LightconeReader._shell_kappa_contribution, nside=nside, info=info, chi_j=chi_j)
-        with Pool(processes=nproc) as pool:
+        with ctx.Pool(processes=nproc) as pool:
             # chunksize=1 (the imap_unordered default) is what enables dynamic,
             # work-stealing dispatch across the oversubscribed chunk list.
             for contribution in tqdm(pool.imap_unordered(worker, shells),
