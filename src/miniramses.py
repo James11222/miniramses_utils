@@ -347,7 +347,7 @@ def rd_part(nout,**kwargs):
     p.ndim = ndim
 
     ipart = 0
-    for	icpu in	cpulist:
+    for icpu in cpulist:
         car2 = str(icpu).zfill(5)
         if(backup):
             filename = path+"/backup_"+car1+prefix2+car2
@@ -1309,7 +1309,7 @@ def rd_cell(nout,**kwargs):
         c.x = c.x[ind]
         c.dx = c.dx[ind]
         c.level = c.level[ind]
-        for  ivar in range(0,nvar):
+        for ivar in range(0,nvar):
             c.u[ivar]=c.u[ivar,ind]
         
     return c
@@ -1929,110 +1929,110 @@ def mk_movie(**kwargs):
     return ok 
 
 class ClumpCat:
-   """
-   This is the class for RAMSES clump catalog.
-   """
-   def __init__(self):
-       """
-       This function initialize the clump catalog.
-       """
-       self.index = np.empty(shape=(0),dtype=int)
-       self.parent= np.empty(shape=(0),dtype=int)
-       self.halo = np.empty(shape=(0),dtype=int)
-       self.ncell = np.empty(shape=(0),dtype=int)
-       self.npart = np.empty(shape=(0),dtype=int)
-       self.x = np.empty(shape=(0))
-       self.y = np.empty(shape=(0))
-       self.z = np.empty(shape=(0))
-       self.u = np.empty(shape=(0))
-       self.v = np.empty(shape=(0))
-       self.w = np.empty(shape=(0))
-       self.mpatch = np.empty(shape=(0))
-       self.mass = np.empty(shape=(0))
-       self.dmax = np.empty(shape=(0))
-       self.dmin = np.empty(shape=(0))
-       self.dsad = np.empty(shape=(0))
-       self.dave = np.empty(shape=(0))
-       self.r200c = np.empty(shape=(0))
-       self.rmax = np.empty(shape=(0))
-       self.c200c = np.empty(shape=(0))
+    """
+    This is the class for RAMSES clump catalog.
+    """
+    def __init__(self):
+        """
+        This function initialize the clump catalog.
+        """
+        self.index = np.empty(shape=(0),dtype=int)
+        self.parent= np.empty(shape=(0),dtype=int)
+        self.halo = np.empty(shape=(0),dtype=int)
+        self.ncell = np.empty(shape=(0),dtype=int)
+        self.npart = np.empty(shape=(0),dtype=int)
+        self.x = np.empty(shape=(0))
+        self.y = np.empty(shape=(0))
+        self.z = np.empty(shape=(0))
+        self.u = np.empty(shape=(0))
+        self.v = np.empty(shape=(0))
+        self.w = np.empty(shape=(0))
+        self.mpatch = np.empty(shape=(0))
+        self.mass = np.empty(shape=(0))
+        self.dmax = np.empty(shape=(0))
+        self.dmin = np.empty(shape=(0))
+        self.dsad = np.empty(shape=(0))
+        self.dave = np.empty(shape=(0))
+        self.r200c = np.empty(shape=(0))
+        self.rmax = np.empty(shape=(0))
+        self.c200c = np.empty(shape=(0))
 
 def rd_clump(nout,**kwargs):
-   """
-   This function reads and compiles data for position, mass,
-   density, index, etc from the clump catalog.
+    """
+    This function reads and compiles data for position, mass,
+    density, index, etc from the clump catalog.
 
-   Args:
-       nout: output file number
+    Args:
+        nout: output file number
 
-   Returns:
-       A RAMSES clump catalog with all clump properties
+    Returns:
+        A RAMSES clump catalog with all clump properties
 
-   Authors: Josiah Taylor (Princeton University)
-   """
-   backup = kwargs.get("backup",False)
-   center = kwargs.get("center")
-   radius = kwargs.get("radius")
-   path = kwargs.get("path","./")
-   silent = kwargs.get("silent",False)
+    Authors: Josiah Taylor (Princeton University)
+    """
+    backup = kwargs.get("backup",False)
+    center = kwargs.get("center")
+    radius = kwargs.get("radius")
+    path = kwargs.get("path","./")
+    silent = kwargs.get("silent",False)
 
-   car1 = str(nout).zfill(5)
-   i = rd_info(nout,path=path,backup=backup)
-   ncpu = i.ncpu
-   ndim = i.ndim
-   boxlen = i.boxlen
+    car1 = str(nout).zfill(5)
+    i = rd_info(nout,path=path,backup=backup)
+    ncpu = i.ncpu
+    ndim = i.ndim
+    boxlen = i.boxlen
 
-   output = str(nout).zfill(5)
-   cat = ClumpCat()
-   for i in range(0, ncpu):
-       name = str(i+1).zfill(5)
-       file_name = path+"/output_%s/clump.%s" % (output,name)
-       read_cat = ascii.read(file_name)
-       index = read_cat['index']
-       parent = read_cat['parent']
-       halo = read_cat['halo']
-       ncell = read_cat['ncell']
-       npart = read_cat['npart']
-       x = read_cat['pos_x']
-       y = read_cat['pos_y']
-       z = read_cat['pos_z']
-       u = read_cat['vel_x']
-       v = read_cat['vel_y']
-       w = read_cat['vel_z']
-       dmin = read_cat['rho_min']
-       dmax = read_cat['rho_max']
-       dsad = read_cat['rho_sad']
-       dave = read_cat['rho_ave']
-       mpatch = read_cat['mpatch']
-       mass = read_cat['mass']
-       r200c = read_cat['r200'] #my current version uses 200c as the definition
-       rmax = read_cat['rmax']
-       c200c = read_cat['c200'] #my current version uses 200c as the definition
+    output = str(nout).zfill(5)
+    cat = ClumpCat()
+    for i in range(0, ncpu):
+        name = str(i+1).zfill(5)
+        file_name = path+"/output_%s/clump.%s" % (output,name)
+        read_cat = ascii.read(file_name)
+        index = read_cat['index']
+        parent = read_cat['parent']
+        halo = read_cat['halo']
+        ncell = read_cat['ncell']
+        npart = read_cat['npart']
+        x = read_cat['pos_x']
+        y = read_cat['pos_y']
+        z = read_cat['pos_z']
+        u = read_cat['vel_x']
+        v = read_cat['vel_y']
+        w = read_cat['vel_z']
+        dmin = read_cat['rho_min']
+        dmax = read_cat['rho_max']
+        dsad = read_cat['rho_sad']
+        dave = read_cat['rho_ave']
+        mpatch = read_cat['mpatch']
+        mass = read_cat['mass']
+        r200c = read_cat['r200'] #my current version uses 200c as the definition
+        rmax = read_cat['rmax']
+        c200c = read_cat['c200'] #my current version uses 200c as the definition
 
-       cat.index = np.append(cat.index,index)
-       cat.parent = np.append(cat.parent,parent)
-       cat.halo = np.append(cat.halo,halo)
-       cat.ncell = np.append(cat.ncell,ncell)
-       cat.npart = np.append(cat.npart,npart)
-       cat.x = np.append(cat.x,x)
-       cat.y = np.append(cat.y,y)
-       cat.z = np.append(cat.z,z)
-       cat.u = np.append(cat.u,u)
-       cat.v = np.append(cat.v,v)
-       cat.w = np.append(cat.w,w)
-       cat.mpatch = np.append(cat.mpatch,mpatch)
-       cat.mass = np.append(cat.mass,mass)
-       cat.dmax = np.append(cat.dmax,dmax)
-       cat.dmin = np.append(cat.dmin,dmin)
-       cat.dsad = np.append(cat.dsad,dsad)
-       cat.dave = np.append(cat.dave,dave)
-       cat.r200c = np.append(cat.r200c,r200c)
-       cat.rmax = np.append(cat.rmax,rmax)
-       cat.c200c = np.append(cat.c200c,c200c)
+        cat.index = np.append(cat.index,index)
+        cat.parent = np.append(cat.parent,parent)
+        cat.halo = np.append(cat.halo,halo)
+        cat.ncell = np.append(cat.ncell,ncell)
+        cat.npart = np.append(cat.npart,npart)
+        cat.x = np.append(cat.x,x)
+        cat.y = np.append(cat.y,y)
+        cat.z = np.append(cat.z,z)
+        cat.u = np.append(cat.u,u)
+        cat.v = np.append(cat.v,v)
+        cat.w = np.append(cat.w,w)
+        cat.mpatch = np.append(cat.mpatch,mpatch)
+        cat.mass = np.append(cat.mass,mass)
+        cat.dmax = np.append(cat.dmax,dmax)
+        cat.dmin = np.append(cat.dmin,dmin)
+        cat.dsad = np.append(cat.dsad,dsad)
+        cat.dave = np.append(cat.dave,dave)
+        cat.r200c = np.append(cat.r200c,r200c)
+        cat.rmax = np.append(cat.rmax,rmax)
+        cat.c200c = np.append(cat.c200c,c200c)
 
-    # - - - - - - - - 
-    # derived fields 
-    # - - - - - - - - 
+    # - - - - - - - -
+    # derived fields
+    # - - - - - - - -
 
     # m200c
     omega_mz = i.omega_m * i.aexp**(-3) / (i.omega_m * i.aexp**(-3) + i.omega_l)
@@ -2041,9 +2041,9 @@ def rd_clump(nout,**kwargs):
     cat.m200c = (4 * np.pi / 3) * cat.r200c**3 * d200c # (x rho_m = 1.0 in code units)
     cat.v200c = np.sqrt(i.G * cat.m200c / cat.r200c) # in code units
 
-    # rs 
+    # rs
     cat.rs = cat.r200c / cat.c200c
-    
+
     # quantities at rmax
     xmax = cat.rmax / cat.rs
 
@@ -2051,34 +2051,33 @@ def rd_clump(nout,**kwargs):
     cat.mmax = (4 * np.pi / 3) * cat.rs**3 * (d200c * cat.c200c**3 / _f(cat.c200c)) * _f(xmax) # x rho_m = 1.0 in code units
     cat.vmax = np.sqrt(i.G * cat.mmax / cat.rmax) # in code units
 
-    
-   # Filtering clumps
-   if ( not (center is None)  and not (radius is None) ):
+    # Filtering clumps
+    if ( not (center is None)  and not (radius is None) ):
 
-       # Periodic boundaries
-       xx = cat.x-center[0]
-       xx[xx>boxlen/2]=xx[xx>boxlen/2]-boxlen
-       xx[xx<-boxlen/2]=xx[xx<-boxlen/2]+boxlen
-       cat.x = xx+center[0]
-       xx = cat.y-center[1]
-       xx[xx>boxlen/2]=xx[xx>boxlen/2]-boxlen
-       xx[xx<-boxlen/2]=xx[xx<-boxlen/2]+boxlen
-       cat.y = xx+center[1]
-       xx = cat.z-center[2]
-       xx[xx>boxlen/2]=xx[xx>boxlen/2]-boxlen
-       xx[xx<-boxlen/2]=xx[xx<-boxlen/2]+boxlen
-       cat.z = xx+center[2]
+        # Periodic boundaries
+        xx = cat.x-center[0]
+        xx[xx>boxlen/2]=xx[xx>boxlen/2]-boxlen
+        xx[xx<-boxlen/2]=xx[xx<-boxlen/2]+boxlen
+        cat.x = xx+center[0]
+        xx = cat.y-center[1]
+        xx[xx>boxlen/2]=xx[xx>boxlen/2]-boxlen
+        xx[xx<-boxlen/2]=xx[xx<-boxlen/2]+boxlen
+        cat.y = xx+center[1]
+        xx = cat.z-center[2]
+        xx[xx>boxlen/2]=xx[xx>boxlen/2]-boxlen
+        xx[xx<-boxlen/2]=xx[xx<-boxlen/2]+boxlen
+        cat.z = xx+center[2]
 
-       r = np.sqrt((cat.x-center[0])**2+(cat.y-center[1])**2+(cat.z-center[2])**2)
+        r = np.sqrt((cat.x-center[0])**2+(cat.y-center[1])**2+(cat.z-center[2])**2)
 
-       for attr, value in cat.__dict__.items():
-           if isinstance(value, np.ndarray) and len(value) == len(r):
-               setattr(cat, attr, value[r < radius])
-    
-   if silent==False:
-       txt = "Found "+str(len(cat.index))+" clumps"
-       print(txt)
-   return cat
+        for attr, value in cat.__dict__.items():
+            if isinstance(value, np.ndarray) and len(value) == len(r):
+                setattr(cat, attr, value[r < radius])
+
+    if silent==False:
+        txt = "Found "+str(len(cat.index))+" clumps"
+        print(txt)
+    return cat
 
 def plot_tree(nout,pid,**kwargs):
 
