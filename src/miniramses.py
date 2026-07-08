@@ -1459,6 +1459,8 @@ def rd_info(nout,**kwargs):
     i.unit_v = i.unit_l / i.unit_t
     i.unit_m = i.unit_d * i.unit_l**3
 
+    i.G = 3 / (8 * np.pi) * i.omega_m * i.aexp # gravitational constant in code units
+
     if units:
         import astropy.units as u
         import astropy.constants as const
@@ -1476,7 +1478,6 @@ def rd_info(nout,**kwargs):
         i.texp   *= i.unit_t
 
         i.c = const.c.to(u.cm / u.s).value / i.unit_v.value # speed of light in code units
-        i.G = 3 / (8 * np.pi) * i.omega_m * i.aexp # gravitational constant in code units
 
 
     # Get the temperature conversion
@@ -1952,9 +1953,9 @@ class ClumpCat:
        self.dmin = np.empty(shape=(0))
        self.dsad = np.empty(shape=(0))
        self.dave = np.empty(shape=(0))
-       self.r200 = np.empty(shape=(0))
+       self.r200c = np.empty(shape=(0))
        self.rmax = np.empty(shape=(0))
-       self.c200 = np.empty(shape=(0))
+       self.c200c = np.empty(shape=(0))
 
 def rd_clump(nout,**kwargs):
    """
@@ -2004,9 +2005,10 @@ def rd_clump(nout,**kwargs):
        dave = read_cat['rho_ave']
        mpatch = read_cat['mpatch']
        mass = read_cat['mass']
-       r200 = read_cat['r200']
+       r200c = read_cat['r200'] #my current version uses 200c as the definition
        rmax = read_cat['rmax']
-       c200 = read_cat['c200']
+       c200c = read_cat['c200'] #my current version uses 200c as the definition
+
        cat.index = np.append(cat.index,index)
        cat.parent = np.append(cat.parent,parent)
        cat.halo = np.append(cat.halo,halo)
@@ -2024,10 +2026,32 @@ def rd_clump(nout,**kwargs):
        cat.dmin = np.append(cat.dmin,dmin)
        cat.dsad = np.append(cat.dsad,dsad)
        cat.dave = np.append(cat.dave,dave)
-       cat.r200 = np.append(cat.r200,r200)
+       cat.r200c = np.append(cat.r200c,r200c)
        cat.rmax = np.append(cat.rmax,rmax)
-       cat.c200 = np.append(cat.c200,c200)
+       cat.c200c = np.append(cat.c200c,c200c)
 
+    # - - - - - - - - 
+    # derived fields 
+    # - - - - - - - - 
+
+    # m200c
+    omega_mz = i.omega_m * i.aexp**(-3) / (i.omega_m * i.aexp**(-3) + i.omega_l)
+    d200c = 200 / omega_mz  # 200 times the critical density
+
+    cat.m200c = (4 * np.pi / 3) * cat.r200c**3 * d200c # (x rho_m = 1.0 in code units)
+    cat.v200c = np.sqrt(i.G * cat.m200c / cat.r200c) # in code units
+
+    # rs 
+    cat.rs = cat.r200c / cat.c200c
+    
+    # quantities at rmax
+    xmax = cat.rmax / cat.rs
+
+    # mass and circular velocity at rmax
+    cat.mmax = (4 * np.pi / 3) * cat.rs**3 * (d200c * cat.c200c**3 / _f(cat.c200c)) * _f(xmax) # x rho_m = 1.0 in code units
+    cat.vmax = np.sqrt(i.G * cat.mmax / cat.rmax) # in code units
+
+    
    # Filtering clumps
    if ( not (center is None)  and not (radius is None) ):
 
@@ -2046,27 +2070,11 @@ def rd_clump(nout,**kwargs):
        cat.z = xx+center[2]
 
        r = np.sqrt((cat.x-center[0])**2+(cat.y-center[1])**2+(cat.z-center[2])**2)
-       cat.index = cat.index[r < radius]
-       cat.parent = cat.parent[r < radius]
-       cat.halo = cat.halo[r < radius]
-       cat.ncell = cat.ncell[r < radius]
-       cat.npart = cat.npart[r < radius]
-       cat.x = cat.x[r < radius]
-       cat.y = cat.y[r < radius]
-       cat.z = cat.z[r < radius]
-       cat.u = cat.u[r < radius]
-       cat.v = cat.v[r < radius]
-       cat.w = cat.w[r < radius]
-       cat.mpatch = cat.mpatch[r < radius]
-       cat.mass = cat.mass[r < radius]
-       cat.dmax = cat.dmax[r < radius]
-       cat.dmin = cat.dmin[r < radius]
-       cat.dsad = cat.dsad[r < radius]
-       cat.dave = cat.dave[r < radius]
-       cat.r200 = cat.r200[r < radius]
-       cat.rmax = cat.rmax[r < radius]
-       cat.c200 = cat.c200[r < radius]
 
+       for attr, value in cat.__dict__.items():
+           if isinstance(value, np.ndarray) and len(value) == len(r):
+               setattr(cat, attr, value[r < radius])
+    
    if silent==False:
        txt = "Found "+str(len(cat.index))+" clumps"
        print(txt)
@@ -2183,3 +2191,21 @@ def wr_grafic(dat,header1,header2,fileout):
             f.write_record(plane.T)
 
 
+
+# HELPER FUNCTIONS 
+
+def _f(x):
+    """
+    NFW profile helper function.
+
+    Parameters
+    ----------
+    x : float or array-like
+        Dimensionless radius (r/rs)
+
+    Returns
+    -------
+    float or array-like
+        Value of ln(1+x) - x/(1+x)
+    """
+    return np.log(1 + x) - x / (1 + x)

@@ -5,7 +5,7 @@ import astropy.units as u
 import astropy.constants as const
 import mk_tracks as mkt
 from scipy.interpolate import interp1d
-import SHAM
+import sham
 import pyccl as ccl
 import os 
 
@@ -56,8 +56,8 @@ class Simulation:
         # determine the min and max halo mass of the simulation
         self.cosmo = ccl.Cosmology(Omega_b=0.0492, Omega_c=(self.info.omega_m - 0.0492), 
                       h=self.info.h, A_s=2.2065e-09, n_s=0.9645)
-        self.min_halo_mass = SHAM.compute_halo_Mmin(self.L_box, N_part=self.npart, cosmo=self.cosmo, code_units=True)
-        self.max_halo_mass = SHAM.compute_halo_Mmax(self.L_box, cosmo=self.cosmo, code_units=True)
+        self.min_halo_mass = sham.compute_halo_Mmin(self.L_box, N_part=self.npart, cosmo=self.cosmo, code_units=True)
+        self.max_halo_mass = sham.compute_halo_Mmax(self.L_box, cosmo=self.cosmo, code_units=True)
         self.min_halo_mass_Msun = self.min_halo_mass * (self.info.unit_m * self.info.h).to(u.Msun).value #Msun/h
         self.max_halo_mass_Msun = self.max_halo_mass * (self.info.unit_m * self.info.h).to(u.Msun).value #Msun/h
 
@@ -146,7 +146,7 @@ class Simulation:
 
         # orphans have their tracking_id set to 0, so we can use that to select them, otherwise we can use pop
         if population == 'orph':
-            mask = valid_mask & (self.tracks['tracking_id'][:, self.get_aexp_index(aexp)] != 0)
+            mask = valid_mask & (self.tracks['tracking_id'][:, self.get_aexp_index(aexp)] == 0)
         elif population == 'all':
             mask = valid_mask
         else:
@@ -208,6 +208,9 @@ class Simulation:
         elif sort_by == 'mass':
             sorted_indices = np.argsort(self.tracks['mass'][:, self.get_aexp_index(aexp)][self.mask])
             sorted_values  = self.tracks['mass'][:, self.get_aexp_index(aexp)][self.mask][sorted_indices]
+        elif sort_by == 'm200':
+            sorted_indices = np.argsort(self.tracks['m200'][:, self.get_aexp_index(aexp)][self.mask])
+            sorted_values  = self.tracks['m200'][:, self.get_aexp_index(aexp)][self.mask][sorted_indices]
         elif sort_by == 'Vmax':
             sorted_indices = np.argsort(self.tracks['vmax'][:, self.get_aexp_index(aexp)][self.mask])
             sorted_values  = self.tracks['vmax'][:, self.get_aexp_index(aexp)][self.mask][sorted_indices]
@@ -294,6 +297,9 @@ class Simulation:
         elif sort_by == 'mass':
             if verbose: print(f"Threshold mass needed for n={n_thresh:0.2e} h^3 Mpc^-3: {self.threshold_needed * (self.info.unit_m * self.info.h).to(u.Msun).value :.2e} Msun/h")
             mask = (self.tracks['mass'][:, self.get_aexp_index(aexp)] > self.threshold_needed) & self.mask
+        elif sort_by == 'm200':
+            if verbose: print(f"Threshold m200 needed for n={n_thresh:0.2e} h^3 Mpc^-3: {self.threshold_needed * (self.info.unit_m * self.info.h).to(u.Msun).value :.2e} Msun/h")
+            mask = (self.tracks['m200'][:, self.get_aexp_index(aexp)] > self.threshold_needed) & self.mask
         elif sort_by == 'Mmax':
             if verbose: print(f"Threshold Mmax needed for n={n_thresh:0.2e} h^3 Mpc^-3: {self.threshold_needed * (self.info.unit_m * self.info.h).to(u.Msun).value :.2e} Msun/h")
             mask = (self.tracks['mass_max'] > self.threshold_needed) & self.mask
@@ -303,7 +309,7 @@ class Simulation:
         x, y, z = self.tracks['x'][:, self.get_aexp_index(aexp)][mask], self.tracks['y'][:, self.get_aexp_index(aexp)][mask], self.tracks['z'][:, self.get_aexp_index(aexp)][mask]
 
         # compute the 2PCF
-        r, xi = SHAM.compute_xi(x, y, z, self.info,
+        r, xi = sham.compute_xi(x, y, z, self.info,
                                 nbins=nbins,
                                 min_sep = rmin / (self.info.unit_l * self.info.h).to(u.Mpc).value, 
                                 max_sep = rmax/ (self.info.unit_l * self.info.h).to(u.Mpc).value,

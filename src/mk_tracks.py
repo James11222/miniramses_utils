@@ -67,7 +67,8 @@ def compute_M200(r200, c200, info):
     rho_m = 1.0 # Mean matter density in code units 
     omega_mz = info.omega_m * info.aexp**(-3) / (info.omega_m * info.aexp**(-3) + info.omega_l)
     d200c = 200 / omega_mz  # 200 times the critical density
-    
+    # d200c = 200  # 200 times the background density (HACK FOR OLD SIMS)
+
     M200 = (4 * np.pi / 3) * r200**3 * d200c * rho_m
     return M200
 
