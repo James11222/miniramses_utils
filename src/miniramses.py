@@ -504,7 +504,7 @@ def rd_part(nout,**kwargs):
             car2 = str(icpu).zfill(5)
             filename = path+"/output_"+car1+prefix2+car2
             npart2 = np.fromfile(filename,dtype=np.int32,count=1,offset=4)[0]
-            offset = 8
+            offset = np.int64(8)
 
             # read particle halo id
             hid = np.fromfile(filename,dtype=np.int32,count=npart2,offset=offset)
@@ -1460,6 +1460,7 @@ def rd_info(nout,**kwargs):
     i.unit_m = i.unit_d * i.unit_l**3
 
     i.G = 3 / (8 * np.pi) * i.omega_m * i.aexp # gravitational constant in code units
+    i.rho_m = 1.0
 
     if units:
         import astropy.units as u
@@ -1977,10 +1978,10 @@ def rd_clump(nout,**kwargs):
     silent = kwargs.get("silent",False)
 
     car1 = str(nout).zfill(5)
-    i = rd_info(nout,path=path,backup=backup)
-    ncpu = i.ncpu
-    ndim = i.ndim
-    boxlen = i.boxlen
+    info = rd_info(nout,path=path,backup=backup)
+    ncpu = info.ncpu
+    ndim = info.ndim
+    boxlen = info.boxlen
 
     output = str(nout).zfill(5)
     cat = ClumpCat()
@@ -2035,11 +2036,11 @@ def rd_clump(nout,**kwargs):
     # - - - - - - - -
 
     # m200c
-    omega_mz = i.omega_m * i.aexp**(-3) / (i.omega_m * i.aexp**(-3) + i.omega_l)
+    omega_mz = info.omega_m * info.aexp**(-3) / (info.omega_m * info.aexp**(-3) + info.omega_l)
     d200c = 200 / omega_mz  # 200 times the critical density
 
     cat.m200c = (4 * np.pi / 3) * cat.r200c**3 * d200c # (x rho_m = 1.0 in code units)
-    cat.v200c = np.sqrt(i.G * cat.m200c / cat.r200c) # in code units
+    cat.v200c = np.sqrt(info.G * cat.m200c / cat.r200c) # in code units
 
     # rs
     cat.rs = cat.r200c / cat.c200c
@@ -2049,7 +2050,17 @@ def rd_clump(nout,**kwargs):
 
     # mass and circular velocity at rmax
     cat.mmax = (4 * np.pi / 3) * cat.rs**3 * (d200c * cat.c200c**3 / _f(cat.c200c)) * _f(xmax) # x rho_m = 1.0 in code units
-    cat.vmax = np.sqrt(i.G * cat.mmax / cat.rmax) # in code units
+    #cat.vmax = np.sqrt(info.G * cat.mmax / cat.rmax) # in code units
+    c0 = 2.1626
+    cat.vmax = cat.v200c * np.sqrt((cat.c200c/_f(cat.c200c))/(c0/_f(c0)))
+
+    # tidal radius
+    cat.rtidal = (cat.mpatch / (4 * np.pi * cat.dsad / 3))**(1/3)
+
+    # most massive central clump in the halo
+    cat.is_central = cat.index == cat.parent 
+    cat.is_most_massive = cat.index == cat.halo
+    cat.is_satellite = cat.index != cat.parent
 
     # Filtering clumps
     if ( not (center is None)  and not (radius is None) ):
