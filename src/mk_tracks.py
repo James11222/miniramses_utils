@@ -29,88 +29,88 @@ np.random.seed(42)
 # HELPER FUNCTIONS
 # =============================================================================
 
-def f(x):
-    """
-    NFW profile helper function.
+# def f(x):
+#     """
+#     NFW profile helper function.
 
-    Parameters
-    ----------
-    x : float or array-like
-        Dimensionless radius (r/rs)
+#     Parameters
+#     ----------
+#     x : float or array-like
+#         Dimensionless radius (r/rs)
 
-    Returns
-    -------
-    float or array-like
-        Value of ln(1+x) - x/(1+x)
-    """
-    return np.log(1 + x) - x / (1 + x)
+#     Returns
+#     -------
+#     float or array-like
+#         Value of ln(1+x) - x/(1+x)
+#     """
+#     return np.log(1 + x) - x / (1 + x)
 
-def compute_M200(r200, c200, info):
-    """
-    Compute M200c for an NFW halo.
+# def compute_M200(r200, c200, info):
+#     """
+#     Compute M200c for an NFW halo.
 
-    Parameters
-    ----------
-    r200 : float or array-like
-        r200c (where density = 200 * critical density) [code units]
-    c200 : float or array-like
-        Concentration parameter for c200c (r200c / rs)
-    info : miniramses.Info
-        Info object containing cosmological parameters
+#     Parameters
+#     ----------
+#     r200 : float or array-like
+#         r200c (where density = 200 * critical density) [code units]
+#     c200 : float or array-like
+#         Concentration parameter for c200c (r200c / rs)
+#     info : miniramses.Info
+#         Info object containing cosmological parameters
 
-    Returns
-    -------
-    float or array-like
-        M200c mass [code units]
-    """
+#     Returns
+#     -------
+#     float or array-like
+#         M200c mass [code units]
+#     """
 
-    rho_m = 1.0 # Mean matter density in code units 
-    omega_mz = info.omega_m * info.aexp**(-3) / (info.omega_m * info.aexp**(-3) + info.omega_l)
-    d200c = 200 / omega_mz  # 200 times the critical density
-    # d200c = 200  # 200 times the background density (HACK FOR OLD SIMS)
+#     rho_m = 1.0 # Mean matter density in code units 
+#     omega_mz = info.omega_m * info.aexp**(-3) / (info.omega_m * info.aexp**(-3) + info.omega_l)
+#     d200c = 200 / omega_mz  # 200 times the critical density
+#     # d200c = 200  # 200 times the background density (HACK FOR OLD SIMS)
 
-    M200 = (4 * np.pi / 3) * r200**3 * d200c * rho_m
-    return M200
+#     M200 = (4 * np.pi / 3) * r200**3 * d200c * rho_m
+#     return M200
 
-def compute_vmax(r200, c200, rmax, info):
-    """
-    Compute maximum circular velocity (Vmax) for an NFW halo.
+# def compute_vmax(r200, c200, rmax, info):
+#     """
+#     Compute maximum circular velocity (Vmax) for an NFW halo.
 
-    Uses the formalism from Mo, van den Bosch & White (2010),
-    Galaxy Formation and Evolution, pages 352-353.
+#     Uses the formalism from Mo, van den Bosch & White (2010),
+#     Galaxy Formation and Evolution, pages 352-353.
 
-    Parameters
-    ----------
-    r200 : float or array-like
-        Virial radius (where density = 200 * critical density) [code units]
-    c200 : float or array-like
-        Concentration parameter (r200 / rs)
-    rmax : float or array-like
-        Radius of maximum circular velocity [code units]
-    info : miniramses.Info
-        Info object containing cosmological parameters
+#     Parameters
+#     ----------
+#     r200 : float or array-like
+#         Virial radius (where density = 200 * critical density) [code units]
+#     c200 : float or array-like
+#         Concentration parameter (r200 / rs)
+#     rmax : float or array-like
+#         Radius of maximum circular velocity [code units]
+#     info : miniramses.Info
+#         Info object containing cosmological parameters
 
-    Returns
-    -------
-    float or array-like
-        Maximum circular velocity [code units]
-    """
-    rho_m = 1.0  # Mean matter density in code units
-    G = 3 / (8 * np.pi) * info.omega_m * info.aexp  # Gravitational constant (H0=1)
+#     Returns
+#     -------
+#     float or array-like
+#         Maximum circular velocity [code units]
+#     """
+#     rho_m = 1.0  # Mean matter density in code units
+#     G = 3 / (8 * np.pi) * info.omega_m * info.aexp  # Gravitational constant (H0=1)
 
-    rs = r200 / c200  # Scale radius
-    xmax = rmax / rs  # Dimensionless radius at Vmax
+#     rs = r200 / c200  # Scale radius
+#     xmax = rmax / rs  # Dimensionless radius at Vmax
 
-    # Characteristic overdensity
-    delta_char = (200 / 3) * (c200**3 / f(c200))
+#     # Characteristic overdensity
+#     delta_char = (200 / 3) * (c200**3 / f(c200))
 
-    # Mass enclosed at rmax
-    M_max = 4 * np.pi * rho_m * delta_char * rs**3 * f(xmax)
+#     # Mass enclosed at rmax
+#     M_max = 4 * np.pi * rho_m * delta_char * rs**3 * f(xmax)
 
-    # Maximum circular velocity
-    V_max = np.sqrt(G * M_max / rmax)
+#     # Maximum circular velocity
+#     V_max = np.sqrt(G * M_max / rmax)
 
-    return V_max
+#     return V_max
 
 
 def compute_max_running_average(x, y, window_size=3):
@@ -214,23 +214,23 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
     # -------------------------------------------------------------------------
     aexp_snap = np.zeros(ngal)
     texp_snap = np.zeros(ngal)
-    r200_snap = np.zeros(ngal)
-    c200_snap = np.zeros(ngal)
+    r200c_snap = np.zeros(ngal)
+    c200c_snap = np.zeros(ngal)
     rmax_snap = np.zeros(ngal)
     vmax_snap = np.zeros(ngal)
     mass_snap = np.zeros(ngal)
-    mpatch_snap = np.zeros(ngal)
-    m200_snap = np.zeros(ngal)
+    # mpatch_snap = np.zeros(ngal)
+    m200c_snap = np.zeros(ngal)
     x_snap = np.zeros(ngal)
     y_snap = np.zeros(ngal)
     z_snap = np.zeros(ngal)
-    vx_snap = np.zeros(ngal)
-    vy_snap = np.zeros(ngal)
-    vz_snap = np.zeros(ngal)
+    # vx_snap = np.zeros(ngal)
+    # vy_snap = np.zeros(ngal)
+    # vz_snap = np.zeros(ngal)
     peak_snap = np.zeros(ngal)
     pop_snap = np.zeros(ngal)
     merge_snap = np.zeros(ngal)
-    birth_id_snap = np.zeros(ngal)
+    # birth_id_snap = np.zeros(ngal)
     tracking_id_snap = np.zeros(ngal)
     merging_id_snap = np.zeros(ngal)
 
@@ -272,10 +272,10 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
         x_snap[igal] = tt.pos[0, ind_gal]
         y_snap[igal] = tt.pos[1, ind_gal]
         z_snap[igal] = tt.pos[2, ind_gal]
-        vx_snap[igal] = tt.vel[0, ind_gal]
-        vy_snap[igal] = tt.vel[1, ind_gal]
-        vz_snap[igal] = tt.vel[2, ind_gal]
-        birth_id_snap[igal] = tt.birth_id[ind_gal]
+        # vx_snap[igal] = tt.vel[0, ind_gal]
+        # vy_snap[igal] = tt.vel[1, ind_gal]
+        # vz_snap[igal] = tt.vel[2, ind_gal]
+        # birth_id_snap[igal] = tt.birth_id[ind_gal]
         tracking_id_snap[igal] = tt.tracking_id[ind_gal]
         merging_id_snap[igal] = tt.merging_id[ind_gal]
 
@@ -291,26 +291,28 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
 
             # Extract halo properties (only for non-orphan, non-merged)
             if (not orphan) and (not merged):
-                r200_snap[igal] = cc.r200[ipeak]
+                r200c_snap[igal] = cc.r200c[ipeak]
                 rmax_snap[igal] = cc.rmax[ipeak]
-                c200_snap[igal] = cc.c200[ipeak]
+                vmax_snap[igal] = cc.vmax[ipeak]
+                c200c_snap[igal] = cc.c200c[ipeak]
+                m200c_snap[igal] = cc.m200c[ipeak]
                 mass_snap[igal] = cc.mass[ipeak]
-                mpatch_snap[igal] = cc.mpatch[ipeak]
+                # mpatch_snap[igal] = cc.mpatch[ipeak]
                 peak_snap[igal] = peak_id
 
-                # Compute Vmax with optional scatter
-                vmax_snap[igal] = compute_vmax(
-                    cc.r200[ipeak],
-                    cc.c200[ipeak],
-                    cc.rmax[ipeak],
-                    info
-                ) * (10 ** np.random.normal(0, sigma))
+                # # Compute Vmax with optional scatter
+                # vmax_snap[igal] = compute_vmax(
+                #     cc.r200c[ipeak],
+                #     cc.c200c[ipeak],
+                #     cc.rmax[ipeak],
+                #     info
+                # ) * (10 ** np.random.normal(0, sigma))
 
-                m200_snap[igal] = compute_M200(
-                    cc.r200[ipeak],
-                    cc.c200[ipeak],
-                    info
-                )
+                # m200c_snap[igal] = compute_M200(
+                #     cc.r200c[ipeak],
+                #     cc.c200c[ipeak],
+                #     info
+                # )
 
             # Classify population type
             is_most_massive_central = (cc.index[ipeak] == cc.parent[ipeak]) and \
@@ -332,13 +334,25 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
     # -------------------------------------------------------------------------
     return {
         'iout': iout,
-        'aexp': aexp_snap, 'texp': texp_snap,
-        'r200': r200_snap, 'c200': c200_snap, 'rmax': rmax_snap, 'vmax': vmax_snap,
-        'mass': mass_snap, 'mpatch': mpatch_snap, 'm200': m200_snap,
-        'x': x_snap, 'y': y_snap, 'z': z_snap,
-        'vx': vx_snap, 'vy': vy_snap, 'vz': vz_snap,
-        'peak': peak_snap, 'pop': pop_snap, 'merge': merge_snap,
-        'birth_id':birth_id_snap,
+        'aexp': aexp_snap, 
+        'texp': texp_snap,
+        'r200c': r200c_snap, 
+        'c200c': c200c_snap, 
+        'rmax': rmax_snap, 
+        'vmax': vmax_snap,
+        'mass': mass_snap, 
+        # 'mpatch': mpatch_snap, 
+        'm200c': m200c_snap,
+        'x': x_snap, 
+        'y': y_snap, 
+        'z': z_snap,
+        # 'vx': vx_snap, 
+        # 'vy': vy_snap, 
+        # 'vz': vz_snap,
+        'peak': peak_snap, 
+        'pop': pop_snap, 
+        'merge': merge_snap,
+        # 'birth_id':birth_id_snap,
         'tracking_id': tracking_id_snap, 'merging_id': merging_id_snap
     }
 
@@ -370,7 +384,7 @@ def mk_track(snapshot, **kwargs):
         Lognormal scatter to apply to Vmax (default: 0.0)
     window_size : int, optional
         Window size for maximum mass computation (default: 3)
-    mass_max : bool, optional
+    mpeak : bool, optional
         Compute maximum mass history per track (default: True)
     verbose : bool, optional
         Print diagnostic information (default: True)
@@ -393,7 +407,7 @@ def mk_track(snapshot, **kwargs):
         - pop : (ngal, snapshot) - Population type (1=central, 2=massive central,
                                                      3=satellite, 4=orphan)
         - merge_arr : (ngal, snapshot) - Merger flag (1 if merged)
-        - mass_max : (ngal,) - Maximum mass achieved by each track
+        - mpeak : (ngal,) - Maximum mass achieved by each track
 
     Examples
     --------
@@ -409,9 +423,8 @@ def mk_track(snapshot, **kwargs):
     verbose = kwargs.get("verbose", True)
     sigma = kwargs.get("sigma", 0.0)
     window_size = kwargs.get("window_size", 3)
-    mass_max_flag = kwargs.get("mass_max", True)
     n_cores = kwargs.get("n_cores", cpu_count() - 1)
-    nsmooth_in = kwargs.get("bins", 10)
+    nsmooth_in = kwargs.get("bins", 1)
 
     # Read initial snapshot to determine number of tracks
     t = ram.rd_part(snapshot, prefix="tree", silent=True, **kwargs)
@@ -424,8 +437,8 @@ def mk_track(snapshot, **kwargs):
         print(f"Using {n_cores} cores for parallel processing")
         print(f"Applying mass smoothing with window size: {nsmooth_in}")
         print(f"Applying scatter to vmax with sigma: {sigma}")
-        print(f"Mass max flag is set to: {mass_max_flag}")
-        print(f"Finding maximum mass history with window size: {window_size}")
+        # print(f"Mass max flag is set to: {mpeak_flag}")
+        print(f"Finding maximum m200c and vmax history with window size: {window_size}")
 
     # Print diagnostics
     if verbose:
@@ -441,24 +454,25 @@ def mk_track(snapshot, **kwargs):
     # -------------------------------------------------------------------------
     aexp = np.zeros((ngal, snapshot))
     texp = np.zeros((ngal, snapshot))
-    r200 = np.zeros((ngal, snapshot))
-    c200 = np.zeros((ngal, snapshot))
+    r200c = np.zeros((ngal, snapshot))
+    c200c = np.zeros((ngal, snapshot))
     rmax = np.zeros((ngal, snapshot))
     vmax = np.zeros((ngal, snapshot))
     mass = np.zeros((ngal, snapshot))
-    mpatch = np.zeros((ngal, snapshot))
-    m200 = np.zeros((ngal, snapshot))
+    # mpatch = np.zeros((ngal, snapshot))
+    m200c = np.zeros((ngal, snapshot))
     x = np.zeros((ngal, snapshot))
     y = np.zeros((ngal, snapshot))
     z = np.zeros((ngal, snapshot))
-    vx = np.zeros((ngal, snapshot))
-    vy = np.zeros((ngal, snapshot))
-    vz = np.zeros((ngal, snapshot))
+    # vx = np.zeros((ngal, snapshot))
+    # vy = np.zeros((ngal, snapshot))
+    # vz = np.zeros((ngal, snapshot))
     peak = np.zeros((ngal, snapshot))
-    mass_max = np.zeros(ngal)
+    mpeak = np.zeros(ngal)
+    vpeak = np.zeros(ngal)
     pop = np.zeros((ngal, snapshot))
     merge_arr = np.zeros((ngal, snapshot))
-    birth_id = np.zeros((ngal, snapshot))
+    # birth_id = np.zeros((ngal, snapshot))
     tracking_id = np.zeros((ngal, snapshot))
     merging_id = np.zeros((ngal, snapshot))
     # -------------------------------------------------------------------------
@@ -503,23 +517,23 @@ def mk_track(snapshot, **kwargs):
             iloop = result['iout'] - 1
             aexp[:, iloop] = result['aexp']
             texp[:, iloop] = result['texp']
-            r200[:, iloop] = result['r200']
-            c200[:, iloop] = result['c200']
+            r200c[:, iloop] = result['r200c']
+            c200c[:, iloop] = result['c200c']
             rmax[:, iloop] = result['rmax']
             vmax[:, iloop] = result['vmax']
             mass[:, iloop] = result['mass']
-            mpatch[:, iloop] = result['mpatch']
-            m200[:, iloop] = result['m200']
+            # mpatch[:, iloop] = result['mpatch']
+            m200c[:, iloop] = result['m200c']
             x[:, iloop] = result['x']
             y[:, iloop] = result['y']
             z[:, iloop] = result['z']
-            vx[:, iloop] = result['vx']
-            vy[:, iloop] = result['vy']
-            vz[:, iloop] = result['vz']
+            # vx[:, iloop] = result['vx']
+            # vy[:, iloop] = result['vy']
+            # vz[:, iloop] = result['vz']
             peak[:, iloop] = result['peak']
             pop[:, iloop] = result['pop']
             merge_arr[:, iloop] = result['merge']
-            birth_id[:, iloop] = result['birth_id']
+            # birth_id[:, iloop] = result['birth_id']
             tracking_id[:, iloop] = result['tracking_id']
             merging_id[:, iloop] = result['merging_id']
 
@@ -544,24 +558,25 @@ def mk_track(snapshot, **kwargs):
     out = {
         "aexp": aexp,
         "texp": texp,
-        "r200": r200,
+        "r200c": r200c,
         "rmax": rmax,
         "vmax": vmax,
-        "c200": c200,
+        "c200c": c200c,
         "mass": mass,
-        "mpatch": mpatch,
-        "m200": m200,
+        # "mpatch": mpatch,
+        "m200c": m200c,
         "x": x,
         "y": y,
         "z": z,
-        "vx": vx,
-        "vy": vy,
-        "vz": vz,
+        # "vx": vx,
+        # "vy": vy,
+        # "vz": vz,
         "peak_id": peak,
-        "mass_max": mass_max,
+        "mpeak": mpeak,
+        "vpeak": vpeak,
         "pop": pop,
         "merge_arr": merge_arr,
-        "birth_id": birth_id,
+        # "birth_id": birth_id,
         "tracking_id": tracking_id,
         "merging_id": merging_id
     }
@@ -569,21 +584,30 @@ def mk_track(snapshot, **kwargs):
     # -------------------------------------------------------------------------
     # Compute maximum mass histories
     # -------------------------------------------------------------------------
-    if mass_max_flag:
-        if verbose: print("\nComputing maximum mass histories...")
+    # if mpeak_flag:
+    if verbose: print("\nComputing maximum m200c and vmax histories...")
 
-        for i in range(ngal):
-            mmm = out["mass"][i]
-            aaa = out["aexp"][i]
-            ind = np.where((mmm > 0) & (aaa > 0))[0]
+    for i in range(ngal):
+        mmm = out["m200c"][i]
+        vvv = out["vmax"][i]
+        aaa = out["aexp"][i]
+        ind = np.where((mmm > 0) & (aaa > 0))[0]
 
-            if len(ind) > 0:
-                _, y_ave_max = compute_max_running_average(
-                    aaa[ind],
-                    mmm[ind],
-                    window_size=window_size
-                )
-                out["mass_max"][i] = y_ave_max
+        if len(ind) > 0:
+            _, y_ave_max = compute_max_running_average(
+                aaa[ind],
+                mmm[ind],
+                window_size=window_size
+            )
+            out["mpeak"][i] = y_ave_max
+
+            _, y_ave_max = compute_max_running_average(
+                aaa[ind],
+                vvv[ind],
+                window_size=window_size
+            )
+            out["vpeak"][i] = y_ave_max
+    
 
     # -------------------------------------------------------------------------
     # Package and return results
