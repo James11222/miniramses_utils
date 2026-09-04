@@ -560,229 +560,6 @@ def rd_part(nout,**kwargs):
 
     return p
 
-class LightconeReader:
-
-    @staticmethod
-    def rd_metadata(path, verbose=False):
-        """
-        Read the lightcone shell metadata from the .txt file
-        
-        Returns:
-            Dictionary with keys: 'npart', 'aexp_old', 'aexp'
-        """
-        if verbose:
-            print(f"Reading metadata from {path}")
-        with open(path, 'r') as file:
-            npart = int(file.readline().strip())
-            aexp_old = float(file.readline().strip())
-            aexp = float(file.readline().strip())
-
-        if verbose:
-            print(f"Found {npart} particles")
-
-        return {'npart': npart, 'aexp_old': aexp_old, 'aexp': aexp}
-
-    @staticmethod
-    def rd_part(path, nproperties=7, verbose=False):
-        """
-        Read the lightcone shell from the output directory.
-        nproperties: number of non-idp properties per particle (default 7 for x,y,z,vx,vy,vz,mass)
-        
-        Returns:
-            idp: numpy array of particle IDs (int32) with shape (npart,)
-            properties: numpy array of properties (float32) with shape (nproperties, npart)
-                       where rows are x, y, z, vx, vy, vz, mass (depending on nproperties)
-        """
-        # Construct metadata file path by adding .txt extension
-        if verbose:
-            print(f"Reading lightcone data from {path}")
-        txt_path = path + ".txt"
-        metadata = LightconeReader.rd_metadata(txt_path, verbose=verbose)
-        
-        npart = metadata['npart']
-        
-        # Read the raw data
-        with open(path, 'rb') as f:
-            # Read particle IDs first (8 bytes each)
-            # idp_data = np.frombuffer(f.read(0 * npart), dtype=np.int32) # use this version when processing old output without idp
-            idp_data = np.frombuffer(f.read(4 * npart), dtype=np.int32)
-            
-            # Read the remaining properties (positions, velocities, masses) (4 bytes each)
-            real_data = np.frombuffer(f.read(4 * nproperties * npart), dtype=np.float32)
-            real_data = real_data.reshape(nproperties, npart)
-        
-        return idp_data, real_data
-
-    @staticmethod
-    def rd_cell(path, nproperties=8, verbose=False):
-        """
-        Read the lightcone shell from the output directory.
-        nproperties: number of properties per cell (default 9 for x,y,z,rho,phi,accelx,accely,accelz,dphidt)
-        
-        Returns:
-            properties: numpy array of properties (float32) with shape (nproperties, ncell)
-                       where rows are x, y, z, rho, phi, accelx, accely, accelz, dphidt (depending on nproperties)
-        """
-        # Construct metadata file path by adding .txt extension
-        if verbose:
-            print(f"Reading lightcone data from {path}")
-        txt_path = path + ".txt"
-        metadata = LightconeReader.rd_metadata(txt_path, verbose=verbose)
-        
-        ncell = metadata['npart']
-        
-        # Read the raw data
-        with open(path, 'rb') as f:
-
-            # Read the remaining properties (positions, velocities, masses) (4 bytes each)
-            real_data = np.frombuffer(f.read(4 * nproperties * ncell), dtype=np.float32)
-            real_data = real_data.reshape(nproperties, ncell)
-        
-        return real_data
-
-    @staticmethod
-    def rd_positions_as_healpix(path, nside, verbose=False):
-        """
-        Read the lightcone shell from the output directory and convert it to a Healpix map.
-        nside: Healpix resolution parameter
-        """
-        import healpy as hp
-        
-        # Read only the position data (properties x, y, z)
-        idp, properties = LightconeReader.rd_part(path, nproperties=3, verbose=verbose)
-        x, y, z = properties[0], properties[1], properties[2]  # x, y, z are the first 3 properties
-        
-        # Convert Cartesian coordinates to spherical coordinates
-        # x is the depth (cone axis), y and z are the transverse coordinates
-        r = np.sqrt(x**2 + y**2 + z**2)
-        theta = np.pi/2 - np.arcsin(z / r)  # polar angle from x-axis
-        phi = np.arcsin(y / r)    # azimuthal angle in y-z plane
-        
-        # Create HEALPix map
-        npix = hp.nside2npix(nside)
-        healpix_map = np.zeros(npix)
-        
-        # Convert spherical coordinates to HEALPix pixel indices
-        pix_indices = hp.ang2pix(nside, theta, phi)
-        
-        # Count particles in each pixel
-        unique_pix, counts = np.unique(pix_indices, return_counts=True)
-        healpix_map[unique_pix] = counts
-
-        return healpix_map
-
-    @staticmethod
-    def get_shells(path, verbose=False):
-        """
-        Get all lightcone shell information from the lightcone directory.
-        Looks for files named 'part_xxxxx' and 'tree_xxxxx' and returns shell information.
-        
-        Args:
-            path: Path to the lightcone directory
-            verbose: Print debug information
-            
-        Returns:
-            List of dictionaries with shell information, sorted by nstep in descending order
-            (largest nout corresponds to shell closest to observer)
-            
-            Each dictionary contains:
-            - 'nstep': shell number (int)
-            - 'part_file': path to part binary file (str, or None if doesn't exist)
-            - 'part_metadata': path to part .txt file (str, or None if doesn't exist)
-            - 'part_size': size of part binary file in bytes (int, or None if doesn't exist)
-            - 'tree_file': path to tree binary file (str, or None if doesn't exist)
-            - 'tree_metadata': path to tree .txt file (str, or None if doesn't exist)
-            - 'tree_size': size of tree binary file in bytes (int, or None if doesn't exist)
-            - 'grav_file': path to grav binary file (str, or None if doesn't exist)
-            - 'grav_metadata': path to grav .txt file (str, or None if doesn't exist)
-            - 'grav_size': size of grav binary file in bytes (int, or None if doesn't exist)
-        """
-        # Check if path exists
-        if not os.path.exists(path):
-            if verbose:
-                print(f"Path {path} does not exist")
-            return []
-        
-        # Define patterns for each file type
-        patterns = {
-            'part_file': re.compile(r'^part_(\d{5})$'),
-            'part_metadata': re.compile(r'^part_(\d{5})\.txt$'),
-            'tree_file': re.compile(r'^tree_(\d{5})$'),
-            'tree_metadata': re.compile(r'^tree_(\d{5})\.txt$'),
-            'grav_file': re.compile(r'^grav_(\d{5})$'),
-            'grav_metadata': re.compile(r'^grav_(\d{5})\.txt$')
-        }
-        
-        shells = {}  # Dictionary to collect shell information by nstep
-        
-        try:
-            # Loop over all files in the directory
-            for filename in os.listdir(path):
-                filepath = os.path.join(path, filename)
-                if not os.path.isfile(filepath):
-                    continue
-                
-                # Check each pattern
-                for file_type, pattern in patterns.items():
-                    match = pattern.match(filename)
-                    if match:
-                        nstep = int(match.group(1))
-                        
-                        # Initialize shell entry if needed
-                        if nstep not in shells:
-                            shells[nstep] = {'nstep': nstep}
-                        
-                        # Store file path
-                        shells[nstep][file_type] = filepath
-                        
-                        # Store file size for binary files
-                        if file_type in ['part_file', 'tree_file']:
-                            try:
-                                shells[nstep][file_type.replace('_file', '_size')] = os.path.getsize(filepath)
-                                if verbose:
-                                    print(f"Found {file_type} shell {nstep}: {os.path.getsize(filepath)/1024**2:.2f} MB")
-                            except OSError:
-                                if verbose:
-                                    print(f"Warning: Could not get size for {file_type} shell {nstep}")
-                        break
-                        
-        except OSError as e:
-            if verbose:
-                print(f"Error reading directory {path}: {e}")
-            return []
-        
-        # Convert to list and sort by nstep in descending order
-        shell_list = list(shells.values())
-        shell_list.sort(key=lambda x: x['nstep'], reverse=True)
-        
-        # Fill in None values for missing fields
-        for shell in shell_list:
-            for field in ['part_file', 'part_metadata', 'part_size', 'tree_file', 'tree_metadata', 'tree_size']:
-                if field not in shell:
-                    shell[field] = None
-        
-        # Print statistics only in verbose mode
-        if verbose and shell_list:
-            part_shells = [s for s in shell_list if s['part_file'] is not None]
-            tree_shells = [s for s in shell_list if s['tree_file'] is not None]
-            grav_shells = [s for s in shell_list if s['grav_file'] is not None]
-            
-            print(f"Found {len(shell_list)} total shells ({len(part_shells)} part, {len(tree_shells)} tree)")
-            
-            if part_shells:
-                total_part_size = sum(s['part_size'] for s in part_shells if s['part_size'] is not None)
-                print(f"Part files total size: {total_part_size/1024**3:.2f} GB")
-            
-            if tree_shells:
-                total_tree_size = sum(s['tree_size'] for s in tree_shells if s['tree_size'] is not None)
-                print(f"Tree files total size: {total_tree_size/1024**3:.2f} GB")
-
-            if grav_shells:
-                total_grav_size = sum(s['grav_size'] for s in grav_shells if s['grav_size'] is not None)
-                print(f"Grav files total size: {total_grav_size/1024**3:.2f} GB")
-
-        return shell_list
-
 class Level:
     def __init__(self,nndim):
         self.level = 0
@@ -849,7 +626,7 @@ def rd_amr(nout,**kwargs):
         amr[ilevel].refined = np.zeros([2**ndim,amr[ilevel].ngrid],dtype=bool)
 
     iskip = np.zeros(nlevelmax, dtype=int)
-    nvar = ndim+2**ndim
+    nvar = ndim+1
 
     # Reading and storing data
     for icpu in cpulist:
@@ -874,8 +651,9 @@ def rd_amr(nout,**kwargs):
                 amr[ilevel].xg[idim,iskip[ilevel]:iskip[ilevel]+ncache] = transfer[idim]
                 
             # Store cell refinement map
+            refined_int = transfer[ndim]
             for ind in range(0,2**ndim):
-                amr[ilevel].refined[ind,iskip[ilevel]:iskip[ilevel]+ncache] = transfer[ndim+ind]
+                amr[ilevel].refined[ind,iskip[ilevel]:iskip[ilevel]+ncache] = (refined_int >> ind) & 1
             
             offset = offset + ncache*nvar*4
             iskip[ilevel] = iskip[ilevel] + ncache
@@ -1255,24 +1033,26 @@ def rd_cell(nout,**kwargs):
 
     c = Cell(ndim,nvar)
     c.ncell = ncell
-    
+
+    c.x = np.zeros([ndim, ncell])
+    c.u = np.zeros([nvar, ncell])
+    c.dx = np.zeros(ncell)
+    c.level = np.zeros(ncell, dtype=np.int8)
+
+    icell = 0
     for ilev in range(0,nlevelmax):
         dx = 0.5*boxlen/2**ilev
         for ind in range(0,2**ndim):
-            nc = np.count_nonzero(a[ilev].refined[ind] == False)
+            mask = a[ilev].refined[ind] == False
+            nc = np.count_nonzero(mask)
             if (nc > 0):
-                xc = np.zeros([ndim,nc])
                 for idim in range(0,ndim):
-                    xc[idim,:]= (2*a[ilev].xg[idim,np.where(a[ilev].refined[ind] == False)]+1+offset[idim,ind])*dx
-                c.x = np.append(c.x,xc,axis=1)
-                uc = np.zeros([nvar,nc])
+                    c.x[idim, icell:icell+nc] = (2*a[ilev].xg[idim,mask]+1+offset[idim,ind])*dx
                 for ivar in range(0,nvar):
-                    uc[ivar,:]= h[ilev].u[ivar,ind,np.where(a[ilev].refined[ind] == False)]
-                c.u = np.append(c.u,uc,axis=1)
-                dd = np.ones(nc)*dx
-                c.dx = np.append(c.dx,dd)
-                dd = np.ones(nc,dtype=np.int8) * ilev
-                c.level = np.append(c.level,dd)
+                    c.u[ivar, icell:icell+nc] = h[ilev].u[ivar,ind,mask]
+                c.dx[icell:icell+nc] = dx
+                c.level[icell:icell+nc] = ilev
+                icell = icell + nc
 
     # Filtering cells
     if ( not (center is None)  and not (radius is None) ):
@@ -2057,9 +1837,9 @@ def rd_clump(nout,**kwargs):
     # tidal radius
     cat.rtidal = (cat.mpatch / (4 * np.pi * cat.dsad / 3))**(1/3)
 
-    # most massive central clump in the halo
+    # most massive central clump in the halo 
     cat.is_central = cat.index == cat.parent 
-    cat.is_most_massive = cat.index == cat.halo
+    cat.is_most_dense = cat.index == cat.halo
     cat.is_satellite = cat.index != cat.parent
 
     # Filtering clumps
