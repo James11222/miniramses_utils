@@ -15,7 +15,7 @@ class Cool:
     """
     def __init__(self,n1,n2):
         """
-        This function initialize the cooling table. 
+        This function initialize the cooling table.
         Args:
             n1: number of points for the gas density axis
             n2: number of points for the gas temperature axis
@@ -40,7 +40,7 @@ def clean_spec(dat,n1,n2):
     return dat
 
 def rd_cool(filename):
-    """This function reads a RAMSES cooling table file (unformatted Fortran binary) 
+    """This function reads a RAMSES cooling table file (unformatted Fortran binary)
     and store it in a cooling object.
 
     Args:
@@ -132,7 +132,7 @@ def test_cool(filename):
                 axis[id,it].set_xlabel("log time [Myr]")
             if it==n_t-1 and id==n_d-1:
                 axis[id,it].legend(loc="lower right")
-            axis[id,it].set_title('log nH = ' + str(np.log10(nh[id])) + 
+            axis[id,it].set_title('log nH = ' + str(np.log10(nh[id])) +
                                   ' log T = ' + str(np.log10(data[id,it,ix,0,0])), y=0.9, va="top")
             i=i+1
 
@@ -141,7 +141,7 @@ class Map:
     """
     def __init__(self,nx,ny):
         """This function initalize a map object.
-        
+
         Args:
             nx: number of pixels in the x direction
             ny: number of pixels in the y direction
@@ -171,7 +171,7 @@ def rd_map(filename):
         t, dx, dy, dz = f.read_reals('f8')
         nx, ny = f.read_ints('i')
         dat = f.read_reals('f4')
-    
+
     dat = np.array(dat)
     dat = dat.reshape(ny, nx)
     m = Map(nx,ny)
@@ -179,7 +179,7 @@ def rd_map(filename):
     m.time = t
     m.nx = nx
     m.ny = ny
-    
+
     return m
 
 class Histo:
@@ -210,7 +210,7 @@ def rd_histo(filename):
         import miniramses as ram
         h = ram.rd_histo("histo.dat")
         plt.imshow(h.data,origin="lower")
-    
+
     Authors: Romain Teyssier (Princeton University, October 2022)
     """
     with FortranFile(filename, 'r') as f:
@@ -256,10 +256,10 @@ class Part:
         if(peak):
             self.halo_id = np.zeros([nnp],dtype=np.int32)
             self.peak_id = np.zeros([nnp],dtype=np.int32)
-            
+
 def rd_part(nout,**kwargs):
-    """This function reads a RAMSES particle file (unformatted Fortran binary) 
-    as produced by the RAMSES code in the snapshot directory output_00* 
+    """This function reads a RAMSES particle file (unformatted Fortran binary)
+    as produced by the RAMSES code in the snapshot directory output_00*
     and store it in a variable containing all the particle information (Part object).
 
     Args:
@@ -289,10 +289,10 @@ def rd_part(nout,**kwargs):
         import miniramses as ram
         p = ram.rd_part(12,center=[0.5,0.5,0.5],radius=0.1)
         print(np.max(p.pos[0]))
-    
+
     Authors: Romain Teyssier (Princeton University, October 2022)
     """
-    
+
     prefix = kwargs.get("prefix","part")
     backup = kwargs.get("backup",False)
     center = kwargs.get("center")
@@ -357,7 +357,7 @@ def rd_part(nout,**kwargs):
         npart2 = np.fromfile(filename,dtype=np.int32,count=1,offset=4)[0]
 
         offset = np.int64(8) # prevent overflow
-        
+
         # read particle positions
         for idim in range(0,ndim):
             if(backup):
@@ -492,7 +492,7 @@ def rd_part(nout,**kwargs):
         ipart = ipart + npart2
 
     if(peak):
-        prefix2="/peak_part."        
+        prefix2="/peak_part."
         if(star):
             prefix2="/peak_star."
         if(sink):
@@ -598,11 +598,11 @@ def rd_amr(nout,**kwargs):
     amr=[]
     for ilevel in range(0,nlevelmax):
         amr.append(Level(ndim))
-        
+
     amr[0].boxlen = i.boxlen
-    
+
     numbl = np.zeros([nlevelmax,ncpu],dtype=np.int32)
-    
+
     # Reading and computing total AMR grids count
     for icpu in cpulist:
 
@@ -649,15 +649,15 @@ def rd_amr(nout,**kwargs):
             # Store grid Cartesian index
             for idim in range(0,ndim):
                 amr[ilevel].xg[idim,iskip[ilevel]:iskip[ilevel]+ncache] = transfer[idim]
-                
+
             # Store cell refinement map
             refined_int = transfer[ndim]
             for ind in range(0,2**ndim):
                 amr[ilevel].refined[ind,iskip[ilevel]:iskip[ilevel]+ncache] = (refined_int >> ind) & 1
-            
+
             offset = offset + ncache*nvar*4
             iskip[ilevel] = iskip[ilevel] + ncache
-            
+
     return amr
 
 class Hydro:
@@ -699,7 +699,7 @@ def rd_hydro(nout,**kwargs):
         filename = path+"/output_"+car1+"/"+prefix+".00001"
 
     nvar = np.fromfile(filename,dtype=np.int32,count=1,offset=4)[0]
-    
+
     txt = "Found nvar="+str(nvar)
     print(txt)
     print("Reading "+prefix+" data...")
@@ -708,9 +708,9 @@ def rd_hydro(nout,**kwargs):
     for ilevel in range(0,nlevelmax):
         hydro.append(Hydro(ndim,nvar))
         hydro[ilevel].level = ilevel
-        
+
     numbl = np.zeros([nlevelmax,ncpu],dtype=np.int32)
-    
+
     # Reading and computing total AMR grids count
     for icpu in cpulist:
 
@@ -733,7 +733,7 @@ def rd_hydro(nout,**kwargs):
 
     iskip = np.zeros(nlevelmax, dtype=int)
     nvartot = nvar*2**ndim
-    
+
     # Reading and storing data
     for icpu in cpulist:
 
@@ -744,7 +744,7 @@ def rd_hydro(nout,**kwargs):
             filename = path+"/output_"+car1+"/"+prefix+"."+car2
 
         offset = 16 + 4*(nlevelmax+1-levelmin)
-        
+
         for ilevel in range(levelmin-1,nlevelmax):
             ncache = numbl[ilevel,icpu-1]
 
@@ -753,7 +753,7 @@ def rd_hydro(nout,**kwargs):
             else:
                 transfer = np.fromfile(filename,dtype=np.float32,count=nvartot*ncache,offset=offset)
 
-            transfer = np.reshape(transfer,(ncache,nvar,2**ndim))            
+            transfer = np.reshape(transfer,(ncache,nvar,2**ndim))
             transfer = np.transpose(transfer,(1,2,0))
 
             # Store cell hydro variables
@@ -788,9 +788,9 @@ def mk_image(x,y,dx,var):
     nlev = int(np.log(dxmax/dxmin)/np.log(2))+1
 
     print("Making image of size: ",nx,ny)
-    
+
     image = np.zeros((nx,ny))
-    
+
     for lev in range(0,nlev):
 
         dxloc = dxmax/2**lev
@@ -844,9 +844,9 @@ def mk_cube(x,y,z,dx,var):
     nlev = int(np.log(dxmax/dxmin)/np.log(2))+1
 
     print("Making cube of size: ",nx,ny,nz)
-    
+
     cube = np.zeros((nx,ny,nz))
-    
+
     for lev in range(0,nlev):
 
         dxloc = dxmax/2**lev
@@ -969,8 +969,8 @@ class Cell:
         self.level = np.empty(shape=(0),dtype=np.int8)
 
 def rd_cell(nout,**kwargs):
-    """This function reads RAMSES AMR and hydro files (unformatted Fortran binary) 
-    as produced by the RAMSES code in the snapshot directory output_00* 
+    """This function reads RAMSES AMR and hydro files (unformatted Fortran binary)
+    as produced by the RAMSES code in the snapshot directory output_00*
     and store it in a variable containing all the hydro leaf cells information (Cell object).
 
     Args:
@@ -999,7 +999,7 @@ def rd_cell(nout,**kwargs):
 
     Authors: Romain Teyssier (Princeton University, October 2022)
     """
-    
+
     path = kwargs.get("path","./")
     center = kwargs.get("center")
     radius = kwargs.get("radius")
@@ -1012,7 +1012,7 @@ def rd_cell(nout,**kwargs):
     ndim = a[0].ndim
     nvar = h[0].nvar
     boxlen = a[0].boxlen
-    
+
     offset = np.zeros([ndim,2**ndim])
     if (ndim == 1):
         offset[0,:]=[-0.5,0.5]
@@ -1091,7 +1091,7 @@ def rd_cell(nout,**kwargs):
         c.level = c.level[ind]
         for ivar in range(0,nvar):
             c.u[ivar]=c.u[ivar,ind]
-        
+
     return c
 
 def save_cell(c,filename):
@@ -1154,7 +1154,7 @@ def rd_log(filename,**kwargs):
         import miniramses as ram
         r = ram.rd_log("run.log")
         plt.plot(r["x"],r["d"]))
-    
+
     Authors: Romain Teyssier (Princeton University, October 2022)
     """
     cmd="grep -n Output "+filename+" > /tmp/out.txt"
@@ -1189,9 +1189,9 @@ def rd_log(filename,**kwargs):
 class Info:
     def __init__(self,nncpu):
         self.bound_key = np.zeros(shape=(nncpu+1),dtype=np.double)
-        
+
 def rd_info(nout,**kwargs):
-    
+
     backup = kwargs.get("backup",False)
     path = kwargs.get("path","./")
     units = kwargs.get("units",False)
@@ -1222,10 +1222,10 @@ def rd_info(nout,**kwargs):
     i.time=info[8][1]
     i.texp=info[9][1]
     i.aexp=info[10][1]
-    i.redshift= 0.0 if (1.0/i.aexp)-1.0 < 0 else (1.0/i.aexp)-1.0 
+    i.redshift= 0.0 if (1.0/i.aexp)-1.0 < 0 else (1.0/i.aexp)-1.0
     #
     i.H0=info[11][1]
-    i.h= i.H0 / 100.0 
+    i.h= i.H0 / 100.0
     #
     i.omega_m=info[12][1]
     i.omega_l=info[13][1]
@@ -1251,11 +1251,11 @@ def rd_info(nout,**kwargs):
         i.unit_d *= u.g / u.cm**3
         i.unit_t *= u.s
         i.unit_v *= u.cm / u.s
-        i.unit_m *= u.g 
-        
+        i.unit_m *= u.g
+
         i.H0     *= u.km / u.s / u.Mpc
         i.boxlen *= i.unit_l
-        i.time   *= i.unit_t 
+        i.time   *= i.unit_t
         i.texp   *= i.unit_t
 
         i.c = const.c.to(u.cm / u.s).value / i.unit_v.value # speed of light in code units
@@ -1317,7 +1317,7 @@ def rd_info(nout,**kwargs):
     return i
 
 def hilbert3d(x,y,z,bit_length):
-    
+
     state_diagram = [ 1, 2, 3, 2, 4, 5, 3, 5,
                       0, 1, 3, 2, 7, 6, 4, 5,
                       2, 6, 0, 7, 8, 8, 0, 7,
@@ -1352,19 +1352,19 @@ def hilbert3d(x,y,z,bit_length):
     y_bit_mask = np.zeros(bit_length  ,dtype="bool")
     z_bit_mask = np.zeros(bit_length  ,dtype="bool")
     i_bit_mask = np.zeros(3*bit_length,dtype=bool)
-    
+
     for ip in  range(0,n):
-        
+
         for i in range(0,bit_length):
             x_bit_mask[i] = x[ip] & (1 << i)
             y_bit_mask[i] = y[ip] & (1 << i)
             z_bit_mask[i] = z[ip] & (1 << i)
-            
+
         for i in range(0,bit_length):
             i_bit_mask[3*i+2] = x_bit_mask[i]
             i_bit_mask[3*i+1] = y_bit_mask[i]
             i_bit_mask[3*i  ] = z_bit_mask[i]
-            
+
         cstate = 0
         for i in range(bit_length-1,-1,-1):
             b2 = 0
@@ -1383,46 +1383,46 @@ def hilbert3d(x,y,z,bit_length):
             i_bit_mask[3*i+1] = hdigit & (1 << 1)
             i_bit_mask[3*i  ] = hdigit & (1 << 0)
             cstate = nstate
-            
+
         order[ip]= 0
         for i in range(0,3*bit_length):
             b0 = 0
             if (i_bit_mask[i]):
                 b0 = 1
             order[ip] = order[ip] + float(b0)*2.**i
-                
+
     return order
 
 def hilbert2d(x,y,bit_length):
-    
-    state_diagram = [ 1, 0, 2, 0, 
-                      0, 1, 3, 2, 
-                      0, 3, 1, 1, 
-                      0, 3, 1, 2, 
-                      2, 2, 0, 3, 
-                      2, 1, 3, 0, 
-                      3, 1, 3, 2, 
+
+    state_diagram = [ 1, 0, 2, 0,
+                      0, 1, 3, 2,
+                      0, 3, 1, 1,
+                      0, 3, 1, 2,
+                      2, 2, 0, 3,
+                      2, 1, 3, 0,
+                      3, 1, 3, 2,
                       2, 3, 1, 0 ]
-    
-    state_diagram = np.array(state_diagram)    
+
+    state_diagram = np.array(state_diagram)
     state_diagram = state_diagram.reshape((4,2,4), order='F')
-    
+
     n = len(x)
     order = np.zeros(n,dtype="double")
     x_bit_mask = np.zeros(bit_length  ,dtype="bool")
     y_bit_mask = np.zeros(bit_length  ,dtype="bool")
     i_bit_mask = np.zeros(2*bit_length,dtype=bool)
-    
+
     for ip in  range(0,n):
-        
+
         for i in range(0,bit_length):
             x_bit_mask[i] = bool(x[ip] & (1 << i))
             y_bit_mask[i] = bool(y[ip] & (1 << i))
-            
+
         for i in range(0,bit_length):
             i_bit_mask[2*i+1] = x_bit_mask[i]
             i_bit_mask[2*i  ] = y_bit_mask[i]
-            
+
         cstate = 0
         for i in range(bit_length-1,-1,-1):
             b1 = 0
@@ -1437,14 +1437,14 @@ def hilbert2d(x,y,bit_length):
             i_bit_mask[2*i+1] = hdigit & (1 << 1)
             i_bit_mask[2*i  ] = hdigit & (1 << 0)
             cstate = nstate
-            
+
         order[ip]= 0
         for i in range(0,2*bit_length):
             b0 = 0
             if (i_bit_mask[i]):
                 b0 = 1
             order[ip] = order[ip] + float(b0)*2.**i
-                
+
     return order
 
 def get_cpu_list(info,**kwargs):
@@ -1453,7 +1453,7 @@ def get_cpu_list(info,**kwargs):
     radius = kwargs.get("radius")
     center = np.array(center)
     radius = float(radius)
-    
+
     for ilevel in range(0,info.nlevelmax):
         dx = 1/2**ilevel
         if (dx < 2*radius/info.boxlen):
@@ -1480,7 +1480,7 @@ def get_cpu_list(info,**kwargs):
     else:
         ndom = 1
         order_min = np.array([0.])
-        
+
     bounding_min = order_min*dkey
     bounding_max = (order_min+1)*dkey
 
@@ -1507,7 +1507,7 @@ def get_cpu_list(info,**kwargs):
     return cpu_list
 
 def visu(x,y,dx,v,**kwargs):
-    '''The simple visualization function visu() make a 2D scatter plot from RAMSES AMR data. 
+    '''The simple visualization function visu() make a 2D scatter plot from RAMSES AMR data.
 
     Args:
 
@@ -1519,7 +1519,7 @@ def visu(x,y,dx,v,**kwargs):
     Optional args:
 
         vmin: minimum value for the input array v to use in the color range
-        vmax: maximum value for the input array v to use in the color range 
+        vmax: maximum value for the input array v to use in the color range
         log: when set, use the log of the input array v in the color range
         colorbar: when True, draw a colorbar (default: True)
         log_floor: lower bound applied to |v| before log10 (default 0)
@@ -1531,7 +1531,7 @@ def visu(x,y,dx,v,**kwargs):
 
     Example:
 
-        Example for a 2D or 3D RAMSES dataset using variable c from the object Cell. 
+        Example for a 2D or 3D RAMSES dataset using variable c from the object Cell.
         import miniramses as ram
         c=ram.rd_cell(2)
         ram.visu(c.x[0],c.x[1],c.dx,c.u[0],sort=c.u[0],log=1,vmin=-3,vmax=1)
@@ -1543,7 +1543,7 @@ def visu(x,y,dx,v,**kwargs):
     xmax=np.max(x+dx/2)
     ymin=np.min(y-dx/2)
     ymax=np.max(y+dx/2)
-    
+
     log = kwargs.get("log",None)
     vmin = kwargs.get("vmin",None)
     vmax = kwargs.get("vmax",None)
@@ -1552,7 +1552,7 @@ def visu(x,y,dx,v,**kwargs):
     grid = kwargs.get("grid",None)
     log_floor = kwargs.get("log_floor",0)
     show_colorbar = kwargs.get("colorbar",True)
-    
+
     if( not (log is None)):
         # Standard log scaling: log data; transform limits consistently
         v = np.log10(np.maximum(np.abs(v), float(log_floor)))
@@ -1570,13 +1570,13 @@ def visu(x,y,dx,v,**kwargs):
 
     olddpi = plt.rcParams['figure.dpi']
     plt.rcParams['figure.dpi'] = 58
-    px = 1/plt.rcParams['figure.dpi'] 
+    px = 1/plt.rcParams['figure.dpi']
     fig, ax = plt.subplots(figsize=(1000*px,1000*px))
     ax.set_xlim([xmin,xmax])
     ax.set_ylim([ymin,ymax])
     plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
     plt.scatter(x,y,s=0.0001)
-    rescale=np.maximum(xmax-xmin,ymax-ymin)        
+    rescale=np.maximum(xmax-xmin,ymax-ymin)
     ax.set_aspect("equal")
     edgec = None
     linew = None
@@ -1590,17 +1590,17 @@ def visu(x,y,dx,v,**kwargs):
     plt.rcParams['figure.dpi'] = olddpi
 
 def mk_movie(**kwargs):
-    '''The function mk_movie() takes 2D data files containing maps and converts them into a sequence of images, 
+    '''The function mk_movie() takes 2D data files containing maps and converts them into a sequence of images,
     before combining them into a movie. It requires a standard set of python packages and the Linux packages
     ffmpeg and convert (ImageMagick).
-    
+
     Args:
-    
+
         start: starting index of the sequence of numpy array you wish to turn into image frames.
 
-        stop: number of arrays you wish to be turned into plots. 
-            This will be the variable "snum" for the end product. 
-            For now, if you wish to test out the function, 
+        stop: number of arrays you wish to be turned into plots.
+            This will be the variable "snum" for the end product.
+            For now, if you wish to test out the function,
             you can try out other smaller values to adjust the image for your preferences.
 
         path: path leading to the directory where your files are stored, Default: "."
@@ -1634,7 +1634,7 @@ def mk_movie(**kwargs):
     Exemple:
 
         import miniramses as ram
-        info = ram.mk_movie(start=100,stop=2000,path="../movie1",prefix="dens_",fill=5,suffix=".map",cmap="Reds", 
+        info = ram.mk_movie(start=100,stop=2000,path="../movie1",prefix="dens_",fill=5,suffix=".map",cmap="Reds",
                 cbar="YES", cbunit="log Density [H/cc]", tunit="Gyr",
                 fname="img", mvname="movie", vmin=-1, vmax=6)
 
@@ -1661,20 +1661,20 @@ def mk_movie(**kwargs):
     bunit = kwargs.get("bunit","[code units]")
     fname = kwargs.get("fname","frame")
     mvname = kwargs.get("mvname","movie")
-    
+
     cmd="curl https://tigress-web.princeton.edu/~rt3504/DAT/logo_essai.jpg --output logo_essai.jpg"
     os.system(cmd)
     concom = "convert logo_essai.jpg -resize 280x200 logo_essai.png"
     os.system(concom)
 
-    for snapshot in range(start, stop + 1): 
+    for snapshot in range(start, stop + 1):
         ar = path + "/" + str(prefix) + str(snapshot).zfill(fill) + str(suffix)
         print(ar) #prints file that function is working on.
 
         map =rd_map(ar)
         time = map.time
         array = map.data
-        
+
         if (not (cbar is None)):
             px = 1/plt.rcParams['figure.dpi']
             fig, ax = plt.subplots(figsize=(1000*px,1000*px))
@@ -1682,8 +1682,8 @@ def mk_movie(**kwargs):
             print(np.min(array),np.max(array))
             shw = ax.imshow(array, cmap = cmap, vmin=vmin, vmax=vmax, origin="lower", extent=[0,bsize,0,bsize])
             bar = plt.colorbar(shw,shrink=0.8)
-            bar.set_label(cbunit, fontsize=18) 
-            bar.ax.tick_params(labelsize=18) 
+            bar.set_label(cbunit, fontsize=18)
+            bar.ax.tick_params(labelsize=18)
             plt.ylabel(bunit,fontsize=18)
 
         else:
@@ -1703,11 +1703,11 @@ def mk_movie(**kwargs):
         com = "convert logo_essai.png -bordercolor white -border 0.1 " + newname + " +swap -geometry +100+850 -composite " + newname
         os.system(com)
     print("Input files converted into frames: done")
-    moviecom = "ffmpeg -y -r 30 -f image2 -s 1000x1000 -start_number " +str(start)+" -i " + str(fname) + "%05d.png" + " -vcodec libx264 -crf 25  -pix_fmt yuv420p " + str(mvname) + ".mp4" 
+    moviecom = "ffmpeg -y -r 30 -f image2 -s 1000x1000 -start_number " +str(start)+" -i " + str(fname) + "%05d.png" + " -vcodec libx264 -crf 25  -pix_fmt yuv420p " + str(mvname) + ".mp4"
     os.system(moviecom)
     ok = "Movie: done"
     print(ok)
-    return ok 
+    return ok
 
 class ClumpCat:
     """
@@ -1837,8 +1837,8 @@ def rd_clump(nout,**kwargs):
     # tidal radius
     cat.rtidal = (cat.mpatch / (4 * np.pi * cat.dsad / 3))**(1/3)
 
-    # most massive central clump in the halo 
-    cat.is_central = cat.index == cat.parent 
+    # most massive central clump in the halo
+    cat.is_central = cat.index == cat.parent
     cat.is_most_dense = cat.index == cat.halo
     cat.is_satellite = cat.index != cat.parent
 
@@ -1865,9 +1865,11 @@ def rd_clump(nout,**kwargs):
             if isinstance(value, np.ndarray) and len(value) == len(r):
                 setattr(cat, attr, value[r < radius])
 
+
     if silent==False:
         txt = "Found "+str(len(cat.index))+" clumps"
         print(txt)
+
     return cat
 
 def plot_tree(nout,pid,**kwargs):
@@ -1920,7 +1922,7 @@ def rd_grafic(filein):
     Authors: Romain Teyssier (Princeton University, October 2022)
     """
     with FortranFile(filein, 'r') as f:
-        recl = ["i4", "i4", "i4", "f4", "f4", "f4", "f4", "f4", "f4", "f4", "f4"] 
+        recl = ["i4", "i4", "i4", "f4", "f4", "f4", "f4", "f4", "f4", "f4", "f4"]
         n1, n2, n3, dx, x1, x2, x3, a, omega_m, omega_l, h0 = f.read_record(*recl)
         n1=int(n1[0])
         n2=int(n2[0])
@@ -1982,7 +1984,7 @@ def wr_grafic(dat,header1,header2,fileout):
 
 
 
-# HELPER FUNCTIONS 
+# HELPER FUNCTIONS
 
 def _f(x):
     """

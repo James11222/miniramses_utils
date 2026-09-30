@@ -5,6 +5,7 @@ from scipy.io import FortranFile
 from astropy.io import ascii
 import os
 import re
+import glob
 
 import time
 
@@ -503,7 +504,7 @@ def rd_part(nout,**kwargs):
             car2 = str(icpu).zfill(5)
             filename = path+"/output_"+car1+prefix2+car2
             npart2 = np.fromfile(filename,dtype=np.int32,count=1,offset=4)[0]
-            offset = 8
+            offset = np.int64(8)
 
             # read particle halo id
             hid = np.fromfile(filename,dtype=np.int32,count=npart2,offset=offset)
@@ -1416,6 +1417,7 @@ def rd_info(nout,**kwargs):
 
     backup = kwargs.get("backup",False)
     path = kwargs.get("path","./")
+    units = kwargs.get("units",False)
 
     car1 = str(nout).zfill(5)
     if(backup):
@@ -1432,26 +1434,77 @@ def rd_info(nout,**kwargs):
 
     i = Info(ncpu)
 
+    i.path=path
+    i.nout=nout
     i.ncpu=ncpu
     i.ndim=int(info[2][1])
     i.levelmin=int(info[3][1])
     i.nlevelmax=int(info[4][1])
+    #
     i.boxlen=info[7][1]
     i.time=info[8][1]
     i.texp=info[9][1]
     i.aexp=info[10][1]
+    i.redshift= 0.0 if (1.0/i.aexp)-1.0 < 0 else (1.0/i.aexp)-1.0
+    #
     i.H0=info[11][1]
+    i.h= i.H0 / 100.0
+    #
     i.omega_m=info[12][1]
     i.omega_l=info[13][1]
     i.omega_k=info[14][1]
     i.omega_b=info[15][1]
     i.gamma=info[16][1]
+    #
     i.unit_l=info[17][1]
     i.unit_d=info[18][1]
     i.unit_t=info[19][1]
+    i.unit_v = i.unit_l / i.unit_t
+    i.unit_m = i.unit_d * i.unit_l**3
+
+    i.G = 3 / (8 * np.pi) * i.omega_m * i.aexp # gravitational constant in code units
+    i.rho_m = 1.0
+
+    if units:
+        import astropy.units as u
+        import astropy.constants as const
+
+        # convert to physical units
+        i.unit_l *= u.cm
+        i.unit_d *= u.g / u.cm**3
+        i.unit_t *= u.s
+        i.unit_v *= u.cm / u.s
+        i.unit_m *= u.g
+
+        i.H0     *= u.km / u.s / u.Mpc
+        i.boxlen *= i.unit_l
+        i.time   *= i.unit_t
+        i.texp   *= i.unit_t
+
+        i.c = const.c.to(u.cm / u.s).value / i.unit_v.value # speed of light in code units
+
 
     # Get the temperature conversion
     i.unit_T2 = ((i.unit_l / i.unit_t)**2) * 1.6605390e-24 / 1.3806490e-16
+    
+    # Read all particle-type header files (*_header.txt) in the output
+    # directory and store the total number of particles of each type as an
+    # info attribute named "n"+prefix (e.g. part_header.txt -> i.npart,
+    # tree_header.txt -> i.ntree, peak_part_header.txt -> i.npeak_part).
+    # Non particle-type headers (e.g. grav_header.txt) are skipped.
+    outdir = os.path.dirname(filename)
+    i.nheader = {}
+    for header_file in sorted(glob.glob(os.path.join(outdir,"*_header.txt"))):
+        prefix = os.path.basename(header_file)[:-len("_header.txt")]
+        with open(header_file) as f:
+            lines = [line.strip() for line in f]
+        # only particle-type headers report a total particle count
+        if "Total number of particles" not in lines:
+            continue
+        idx = lines.index("Total number of particles")
+        nparticles = int(lines[idx+1])
+        setattr(i,"n"+prefix,nparticles)
+        i.nheader[prefix] = nparticles
 
     rd_rt_info = kwargs.get("rt",False)
     if rd_rt_info:
@@ -1904,9 +1957,9 @@ class ClumpCat:
        self.dmin = np.empty(shape=(0))
        self.dsad = np.empty(shape=(0))
        self.dave = np.empty(shape=(0))
-       self.r200 = np.empty(shape=(0))
+       self.r200c = np.empty(shape=(0))
        self.rmax = np.empty(shape=(0))
-       self.c200 = np.empty(shape=(0))
+       self.c200c = np.empty(shape=(0))
 
 def rd_clump(nout,**kwargs):
    """
@@ -1928,10 +1981,10 @@ def rd_clump(nout,**kwargs):
    silent = kwargs.get("silent",False)
 
    car1 = str(nout).zfill(5)
-   i = rd_info(nout,path=path,backup=backup)
-   ncpu = i.ncpu
-   ndim = i.ndim
-   boxlen = i.boxlen
+   info = rd_info(nout,path=path,backup=backup)
+   ncpu = info.ncpu
+   ndim = info.ndim
+   boxlen = info.boxlen
 
    output = str(nout).zfill(5)
    cat = ClumpCat()
@@ -1956,9 +2009,9 @@ def rd_clump(nout,**kwargs):
        dave = read_cat['rho_ave']
        mpatch = read_cat['mpatch']
        mass = read_cat['mass']
-       r200 = read_cat['r200']
+       r200c = read_cat['r200']
        rmax = read_cat['rmax']
-       c200 = read_cat['c200']
+       c200c = read_cat['c200']
        cat.index = np.append(cat.index,index)
        cat.parent = np.append(cat.parent,parent)
        cat.halo = np.append(cat.halo,halo)
@@ -1976,10 +2029,42 @@ def rd_clump(nout,**kwargs):
        cat.dmin = np.append(cat.dmin,dmin)
        cat.dsad = np.append(cat.dsad,dsad)
        cat.dave = np.append(cat.dave,dave)
-       cat.r200 = np.append(cat.r200,r200)
+       cat.r200c = np.append(cat.r200c,r200c)
        cat.rmax = np.append(cat.rmax,rmax)
-       cat.c200 = np.append(cat.c200,c200)
+       cat.c200c = np.append(cat.c200c,c200c)
 
+ 
+    # - - - - - - - -
+    # derived fields
+    # - - - - - - - -
+
+    # m200c
+    omega_mz = info.omega_m * info.aexp**(-3) / (info.omega_m * info.aexp**(-3) + info.omega_l)
+    d200c = 200 / omega_mz  # 200 times the critical density
+
+    cat.m200c = (4 * np.pi / 3) * cat.r200c**3 * d200c # (x rho_m = 1.0 in code units)
+    cat.v200c = np.sqrt(info.G * cat.m200c / cat.r200c) # in code units
+
+    # rs
+    cat.rs = cat.r200c / cat.c200c
+
+    # quantities at rmax
+    xmax = cat.rmax / cat.rs
+
+    # mass and circular velocity at rmax
+    cat.mmax = (4 * np.pi / 3) * cat.rs**3 * (d200c * cat.c200c**3 / _f(cat.c200c)) * _f(xmax) # x rho_m = 1.0 in code units
+    #cat.vmax = np.sqrt(info.G * cat.mmax / cat.rmax) # in code units
+    c0 = 2.1626
+    cat.vmax = cat.v200c * np.sqrt((cat.c200c/_f(cat.c200c))/(c0/_f(c0)))
+
+    # tidal radius
+    cat.rtidal = (cat.mpatch / (4 * np.pi * cat.dsad / 3))**(1/3)
+
+    # most massive central clump in the halo
+    cat.is_central = cat.index == cat.parent
+    cat.is_most_dense = cat.index == cat.halo
+    cat.is_satellite = cat.index != cat.parent
+    
    # Filtering clumps
    if ( not (center is None)  and not (radius is None) ):
 
@@ -1998,26 +2083,11 @@ def rd_clump(nout,**kwargs):
        cat.z = xx+center[2]
 
        r = np.sqrt((cat.x-center[0])**2+(cat.y-center[1])**2+(cat.z-center[2])**2)
-       cat.index = cat.index[r < radius]
-       cat.parent = cat.parent[r < radius]
-       cat.halo = cat.halo[r < radius]
-       cat.ncell = cat.ncell[r < radius]
-       cat.npart = cat.npart[r < radius]
-       cat.x = cat.x[r < radius]
-       cat.y = cat.y[r < radius]
-       cat.z = cat.z[r < radius]
-       cat.u = cat.u[r < radius]
-       cat.v = cat.v[r < radius]
-       cat.w = cat.w[r < radius]
-       cat.mpatch = cat.mpatch[r < radius]
-       cat.mass = cat.mass[r < radius]
-       cat.dmax = cat.dmax[r < radius]
-       cat.dmin = cat.dmin[r < radius]
-       cat.dsad = cat.dsad[r < radius]
-       cat.dave = cat.dave[r < radius]
-       cat.r200 = cat.r200[r < radius]
-       cat.rmax = cat.rmax[r < radius]
-       cat.c200 = cat.c200[r < radius]
+
+    for attr, value in cat.__dict__.items():
+            if isinstance(value, np.ndarray) and len(value) == len(r):
+                setattr(cat, attr, value[r < radius])
+
 
    if silent==False:
        txt = "Found "+str(len(cat.index))+" clumps"
