@@ -155,6 +155,29 @@ def compute_max_running_average(x, y, window_size=3):
     return x_ave_max, y_ave_max
 
 
+def compute_running_peak(y, window_size=3):
+    """
+    Compute the running maximum of the trailing average of y.
+
+    Parameters
+    ----------
+    y : array-like
+        Dependent variable to average (e.g., mass)
+    window_size : int, default=3
+        Number of points in the trailing window
+
+    Returns
+    -------
+    y_peak : ndarray
+        Same shape as y. y_peak[k] is the largest trailing average up to
+        point k. The first window_size - 1 points average what is available.
+    """
+    y = np.asarray(y, dtype=float)
+    n = np.arange(1, y.size + 1)
+    y_ave = np.convolve(y, np.ones(window_size))[:y.size] / np.minimum(n, window_size)
+    return np.maximum.accumulate(y_ave)
+
+
 # =============================================================================
 # CORE PARALLELIZATION FUNCTIONS
 # =============================================================================
@@ -213,10 +236,10 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
     # Initialize output arrays
     # -------------------------------------------------------------------------
     aexp_snap = np.zeros(ngal)
-    texp_snap = np.zeros(ngal)
-    r200c_snap = np.zeros(ngal)
-    c200c_snap = np.zeros(ngal)
-    rmax_snap = np.zeros(ngal)
+    # texp_snap = np.zeros(ngal)
+    # r200c_snap = np.zeros(ngal)
+    # c200c_snap = np.zeros(ngal)
+    # rmax_snap = np.zeros(ngal)
     vmax_snap = np.zeros(ngal)
     mass_snap = np.zeros(ngal)
     # mpatch_snap = np.zeros(ngal)
@@ -229,8 +252,7 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
     # vz_snap = np.zeros(ngal)
     peak_snap = np.zeros(ngal)
     pop_snap = np.zeros(ngal)
-    merge_snap = np.zeros(ngal)
-    # birth_id_snap = np.zeros(ngal)
+    birth_id_snap = np.zeros(ngal)
     tracking_id_snap = np.zeros(ngal)
     merging_id_snap = np.zeros(ngal)
 
@@ -266,7 +288,7 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
 
         # Record time information
         aexp_snap[igal] = info.aexp
-        texp_snap[igal] = info.texp
+        # texp_snap[igal] = info.texp
 
         # Record kinematics
         x_snap[igal] = tt.pos[0, ind_gal]
@@ -275,15 +297,10 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
         # vx_snap[igal] = tt.vel[0, ind_gal]
         # vy_snap[igal] = tt.vel[1, ind_gal]
         # vz_snap[igal] = tt.vel[2, ind_gal]
-        # birth_id_snap[igal] = tt.birth_id[ind_gal]
+        birth_id_snap[igal] = tt.birth_id[ind_gal]
         tracking_id_snap[igal] = tt.tracking_id[ind_gal]
         merging_id_snap[igal] = tt.merging_id[ind_gal]
 
-        # # Match to clump catalog
-        # ipeak_arr = np.where(cc.index == peak_id)[0]
-
-        # if len(ipeak_arr) > 0:
-        #     ipeak = ipeak_arr[0]
 
         # Use dictionary lookup instead of np.where
         if peak_id > 0 and peak_id in clump_dict:
@@ -291,10 +308,10 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
 
             # Extract halo properties (only for non-orphan, non-merged)
             if (not orphan) and (not merged):
-                r200c_snap[igal] = cc.r200c[ipeak]
-                rmax_snap[igal] = cc.rmax[ipeak]
+                # r200c_snap[igal] = cc.r200c[ipeak]
+                # rmax_snap[igal] = cc.rmax[ipeak]
                 vmax_snap[igal] = cc.vmax[ipeak]
-                c200c_snap[igal] = cc.c200c[ipeak]
+                # c200c_snap[igal] = cc.c200c[ipeak]
                 m200c_snap[igal] = cc.m200c[ipeak]
                 mass_snap[igal] = cc.mass[ipeak]
                 # mpatch_snap[igal] = cc.mpatch[ipeak]
@@ -314,20 +331,12 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
                 #     info
                 # )
 
-            # Classify population type
-            is_most_massive_central = (cc.index[ipeak] == cc.parent[ipeak]) and \
-                                     (cc.index[ipeak] == cc.halo[ipeak])
-            is_central = cc.index[ipeak] == cc.parent[ipeak]
-
-            if is_most_massive_central:
-                pop_snap[igal] = 2  # Most massive central
-            elif is_central:
+         
+            # Classify Population Type (simplified)
+            if cc.is_central[ipeak]:
                 pop_snap[igal] = 1  # Central
-            else:
-                pop_snap[igal] = 3  # Satellite
-
-            if merged:
-                merge_snap[igal] = 1
+            elif cc.is_satellite[ipeak]:
+                pop_snap[igal] = -1  # Satellite
 
     # -------------------------------------------------------------------------
     # Return packaged results
@@ -335,10 +344,10 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
     return {
         'iout': iout,
         'aexp': aexp_snap, 
-        'texp': texp_snap,
-        'r200c': r200c_snap, 
-        'c200c': c200c_snap, 
-        'rmax': rmax_snap, 
+        # 'texp': texp_snap,
+        # 'r200c': r200c_snap, 
+        # 'c200c': c200c_snap, 
+        # 'rmax': rmax_snap, 
         'vmax': vmax_snap,
         'mass': mass_snap, 
         # 'mpatch': mpatch_snap, 
@@ -351,9 +360,9 @@ def process_snapshot(iout, ngal, ind, sigma, verbose, kwargs):
         # 'vz': vz_snap,
         'peak': peak_snap, 
         'pop': pop_snap, 
-        'merge': merge_snap,
-        # 'birth_id':birth_id_snap,
-        'tracking_id': tracking_id_snap, 'merging_id': merging_id_snap
+        'birth_id':birth_id_snap,
+        'tracking_id': tracking_id_snap, 
+        'merging_id': merging_id_snap
     }
 
 
@@ -383,9 +392,7 @@ def mk_track(snapshot, **kwargs):
     sigma : float, optional
         Lognormal scatter to apply to Vmax (default: 0.0)
     window_size : int, optional
-        Window size for maximum mass computation (default: 3)
-    mpeak : bool, optional
-        Compute maximum mass history per track (default: True)
+        Trailing window size for mpeak and vpeak (default: 3)
     verbose : bool, optional
         Print diagnostic information (default: True)
 
@@ -407,7 +414,8 @@ def mk_track(snapshot, **kwargs):
         - pop : (ngal, snapshot) - Population type (1=central, 2=massive central,
                                                      3=satellite, 4=orphan)
         - merge_arr : (ngal, snapshot) - Merger flag (1 if merged)
-        - mpeak : (ngal,) - Maximum mass achieved by each track
+        - mpeak : (ngal, snapshot) - Peak smoothed m200c reached up to each output
+        - vpeak : (ngal, snapshot) - Peak smoothed vmax reached up to each output
 
     Examples
     --------
@@ -425,8 +433,10 @@ def mk_track(snapshot, **kwargs):
     window_size = kwargs.get("window_size", 3)
     n_cores = kwargs.get("n_cores", cpu_count() - 1)
     nsmooth_in = kwargs.get("bins", 1)
+    min_part = kwargs.get("min_part", 200)
 
     # Read initial snapshot to determine number of tracks
+    info = ram.rd_info(snapshot, **kwargs)
     t = ram.rd_part(snapshot, prefix="tree", silent=True, **kwargs)
     ind = np.argsort(t.birth_id)
     ngal = len(ind)
@@ -453,10 +463,10 @@ def mk_track(snapshot, **kwargs):
     # Pre-allocate output arrays
     # -------------------------------------------------------------------------
     aexp = np.zeros((ngal, snapshot))
-    texp = np.zeros((ngal, snapshot))
-    r200c = np.zeros((ngal, snapshot))
-    c200c = np.zeros((ngal, snapshot))
-    rmax = np.zeros((ngal, snapshot))
+    # texp = np.zeros((ngal, snapshot))
+    # r200c = np.zeros((ngal, snapshot))
+    # c200c = np.zeros((ngal, snapshot))
+    # rmax = np.zeros((ngal, snapshot))
     vmax = np.zeros((ngal, snapshot))
     mass = np.zeros((ngal, snapshot))
     # mpatch = np.zeros((ngal, snapshot))
@@ -468,11 +478,10 @@ def mk_track(snapshot, **kwargs):
     # vy = np.zeros((ngal, snapshot))
     # vz = np.zeros((ngal, snapshot))
     peak = np.zeros((ngal, snapshot))
-    mpeak = np.zeros(ngal)
-    vpeak = np.zeros(ngal)
+    mpeak = np.zeros((ngal, snapshot))
+    vpeak = np.zeros((ngal, snapshot))
     pop = np.zeros((ngal, snapshot))
-    merge_arr = np.zeros((ngal, snapshot))
-    # birth_id = np.zeros((ngal, snapshot))
+    birth_id = np.zeros((ngal, snapshot))
     tracking_id = np.zeros((ngal, snapshot))
     merging_id = np.zeros((ngal, snapshot))
     # -------------------------------------------------------------------------
@@ -516,10 +525,10 @@ def mk_track(snapshot, **kwargs):
         if result is not None:
             iloop = result['iout'] - 1
             aexp[:, iloop] = result['aexp']
-            texp[:, iloop] = result['texp']
-            r200c[:, iloop] = result['r200c']
-            c200c[:, iloop] = result['c200c']
-            rmax[:, iloop] = result['rmax']
+            # texp[:, iloop] = result['texp']
+            # r200c[:, iloop] = result['r200c']
+            # c200c[:, iloop] = result['c200c']
+            # rmax[:, iloop] = result['rmax']
             vmax[:, iloop] = result['vmax']
             mass[:, iloop] = result['mass']
             # mpatch[:, iloop] = result['mpatch']
@@ -530,12 +539,19 @@ def mk_track(snapshot, **kwargs):
             # vx[:, iloop] = result['vx']
             # vy[:, iloop] = result['vy']
             # vz[:, iloop] = result['vz']
+            birth_id[:, iloop] = result['birth_id']
             peak[:, iloop] = result['peak']
             pop[:, iloop] = result['pop']
-            merge_arr[:, iloop] = result['merge']
-            # birth_id[:, iloop] = result['birth_id']
             tracking_id[:, iloop] = result['tracking_id']
             merging_id[:, iloop] = result['merging_id']
+
+    # apply a simple mask to remove any clumps that never have more than min_part particles in any snapshot
+    mask = np.max(mass, axis=1) > (min_part / info.npart)
+
+    for key in ['aexp', 'vmax', 'mass', 'm200c', 'x', 'y', 'z', 'peak', 'pop', 'birth_id', 'tracking_id', 'merging_id']:
+        locals()[key] = locals()[key][mask]
+
+
 
     # -------------------------------------------------------------------------
     # Apply smoothing to mass histories
@@ -557,11 +573,11 @@ def mk_track(snapshot, **kwargs):
 
     out = {
         "aexp": aexp,
-        "texp": texp,
-        "r200c": r200c,
-        "rmax": rmax,
+        # "texp": texp,
+        # "r200c": r200c,
+        # "rmax": rmax,
         "vmax": vmax,
-        "c200c": c200c,
+        # "c200c": c200c,
         "mass": mass,
         # "mpatch": mpatch,
         "m200c": m200c,
@@ -575,8 +591,7 @@ def mk_track(snapshot, **kwargs):
         "mpeak": mpeak,
         "vpeak": vpeak,
         "pop": pop,
-        "merge_arr": merge_arr,
-        # "birth_id": birth_id,
+        "birth_id": birth_id,
         "tracking_id": tracking_id,
         "merging_id": merging_id
     }
@@ -594,19 +609,10 @@ def mk_track(snapshot, **kwargs):
         ind = np.where((mmm > 0) & (aaa > 0))[0]
 
         if len(ind) > 0:
-            _, y_ave_max = compute_max_running_average(
-                aaa[ind],
-                mmm[ind],
-                window_size=window_size
-            )
-            out["mpeak"][i] = y_ave_max
-
-            _, y_ave_max = compute_max_running_average(
-                aaa[ind],
-                vvv[ind],
-                window_size=window_size
-            )
-            out["vpeak"][i] = y_ave_max
+            # Map each snapshot from first resolved onward to latest resolved point
+            fill = np.searchsorted(ind, np.arange(ind[0], snapshot), side="right") - 1
+            out["mpeak"][i, ind[0]:] = compute_running_peak(mmm[ind], window_size)[fill]
+            out["vpeak"][i, ind[0]:] = compute_running_peak(vvv[ind], window_size)[fill]
     
 
     # -------------------------------------------------------------------------
