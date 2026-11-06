@@ -37,7 +37,7 @@ same elegant 5-phase layout algorithm described in ``mergertreeplot_guide.md``:
 Typical usage
 -------------
     >>> import miniramses as ram, mk_tracks as mk, mergertrees as mt
-    >>> tracks = mk.mk_track(100, n_cores=8)         # build all tracks
+    >>> tracks = mk.mk_track(100, n_cores=8, min_part=0)   # keep all resolved tracks
     >>> info   = ram.rd_info(100)                    # for unit conversions
     >>> fig, ax = mt.plot_merger_tree(tracks, info=info)        # auto-pick main halo
     >>> fig, ax = mt.plot_merger_tree(tracks, root=14)          # explicit root
@@ -108,7 +108,7 @@ class Branch:
     Attributes
     ----------
     bid : int
-        The object's ``birth_id`` (1-based; row ``bid - 1`` in the tracks arrays).
+        The object's ``birth_id`` (1-based; see ``MergerTree.row_of`` for its row).
     snaps : ndarray
         1-based snapshot numbers in which the object exists as a resolved clump.
     ymin, ymax : int
@@ -153,8 +153,10 @@ class MergerTree:
     ----------
     tracks : dict
         Output of :func:`mk_tracks.mk_track`.  Uses the ``mass``, ``merging_id``,
-        ``merge_arr`` and ``aexp`` arrays, all shaped ``(ngal, nsnap)`` and indexed
-        by ``birth_id - 1``.
+        ``birth_id`` and ``aexp`` arrays, all shaped ``(ngal, nsnap)``.  Rows are
+        matched by ``birth_id``, so masked tracks work.  Build them with
+        ``min_part=0`` to keep every branch: a halo that merges into a dropped
+        halo is cut off from the tree.
     root : int, optional
         ``birth_id`` of the halo to use as the tree root.  If omitted, the most
         massive halo that *survives* to the final snapshot is chosen automatically.
@@ -172,8 +174,12 @@ class MergerTree:
         self.info = info
         self.mass = tracks["mass"]
         self.merging_id = tracks["merging_id"]
-        self.merge_arr = tracks["merge_arr"]
         self.ngal, self.nsnap = self.mass.shape
+
+        # birth_id of each row (0 before birth, so the row maximum is the ID) and
+        # the reverse lookup.  Rows are not birth_id - 1 once tracks are masked.
+        self.bids = tracks["birth_id"].max(axis=1).astype(int)
+        self.row_of = {bid: row for row, bid in enumerate(self.bids)}
 
         # aexp per snapshot column (identical for every halo where it exists, so
         # the column-wise max recovers it while ignoring the zero-padded rows).
@@ -192,7 +198,7 @@ class MergerTree:
 
     def _merge_snap(self, row):
         """1-based snapshot at which this object merges, or None."""
-        ma = np.where(self.merge_arr[row] == 1)[0]
+        ma = np.where(self.merging_id[row] > 0)[0]
         return int(ma[0]) + 1 if len(ma) else None
 
     def _build(self, root):
@@ -208,7 +214,7 @@ class MergerTree:
             cols = np.where(self.mass[row] > 0)[0]
             if len(cols) == 0:
                 continue                   # never a resolved clump -> no track
-            bid = row + 1
+            bid = int(self.bids[row])
             target = self._merge_target(row)
             self._branch[bid] = Branch(bid, cols + 1, self._merge_snap(row), target)
             if target > 0:
@@ -248,7 +254,7 @@ class MergerTree:
         (``mass > 0``) and the snapshots where it is flagged as merged are
         disjoint, with the merger strictly *after* the last clump snapshot, so a
         merger connector always points forward in time.  ``mk_track`` optionally
-        *smooths* the mass history (its ``bins`` kwarg, default 10), which bleeds
+        *smooths* the mass history (its ``bins`` kwarg, default 1), which bleeds
         mass into the post-merger snapshots and inflates the apparent lifetime --
         making a connector point backward in time and, more importantly,
         producing incorrect merger/lifetime values if those are quoted.  Mass
@@ -278,7 +284,7 @@ class MergerTree:
                 final[row] = 0.0           # keep survivors only
         if not np.any(final > 0):
             raise ValueError("No surviving halo with mass at the final snapshot.")
-        return int(np.argmax(final)) + 1
+        return int(self.bids[np.argmax(final)])
 
     # ------------------------------------------------------------------- size
     def _size(self, branch):
@@ -553,7 +559,7 @@ class MergerTree:
         ys = node.snaps
         if color_by not in ("column", "black", "k") and smap is not None:
             # Colour each marker by the physical field value at that snapshot.
-            vals = self.tracks[color_by][node.bid - 1][ys - 1]
+            vals = self.tracks[color_by][self.row_of[node.bid]][ys - 1]
             ax.scatter(np.full(len(ys), x), ys, c=vals, cmap=self._field_cmap,
                        norm=self._field_norm, s=(marker_size + 2) ** 2,
                        marker=marker, edgecolor="k", linewidth=0.4, zorder=3)
@@ -595,7 +601,7 @@ class MergerTree:
     def _field_limits(self, field, vmin, vmax):
         vals = []
         for node in self.nodes:
-            v = self.tracks[field][node.bid - 1][node.snaps - 1]
+            v = self.tracks[field][self.row_of[node.bid]][node.snaps - 1]
             vals.append(v[v > 0])
         vals = np.concatenate(vals) if vals else np.array([1.0])
         lo = vmin if vmin is not None else float(vals.min())
@@ -799,7 +805,7 @@ def _main(argv=None):
     import mk_tracks as mk
     import miniramses as ram
 
-    mk_kwargs = {"path": args.path}
+    mk_kwargs = {"path": args.path, "min_part": 0}
     if args.ncores is not None:
         mk_kwargs["n_cores"] = args.ncores
     tracks = mk.mk_track(args.snapshot, **mk_kwargs)
@@ -808,7 +814,7 @@ def _main(argv=None):
     tree = MergerTree(tracks, root=args.root, info=info)
     print(tree.summary())
 
-    fig, ax = tree.plot(color_by=args.color_by, labels=args.labels)
+    fig, ax, _ = tree.plot(color_by=args.color_by, labels=args.labels)
     out = args.output or f"merger_tree_{tree.root_id}.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"Saved {out}")

@@ -8,6 +8,7 @@ from scipy.interpolate import interp1d
 import sham
 import pyccl as ccl
 import os 
+import hashlib
 
 class Simulation:
     """
@@ -34,7 +35,7 @@ class Simulation:
         tracks (dict): Dictionary containing halo tracks.
 
         Methods:
-        make_tracks(verbose, smooth, sigma, window_size): Create or load halo tracks.
+        make_tracks(verbose, smooth, sigma, window_size, min_part, fields): Create or load halo tracks.
         get_aexp_index(aexp): Get index of scale factor closest to specified value.
         create_mask(population, verbose, aexp): Create mask for selecting halo population.
         grab(property_name, aexp, population): Grab specified property from tracks.
@@ -64,37 +65,42 @@ class Simulation:
         self.make_tracks(verbose=kwargs.get('verbose', False), 
                          smooth=kwargs.get('smooth', False), 
                          sigma=kwargs.get('sigma', 0.0),
-                         window_size=kwargs.get('window_size', 3))
+                         window_size=kwargs.get('window_size', 3),
+                         min_part=kwargs.get('min_part', 200),
+                         fields=kwargs.get('fields', mkt.DEFAULT_FIELDS))
         
         # experimental 
         self.delta_aout = kwargs.get('delta_aout', 0.01)
 
-    def make_tracks(self, verbose, smooth, sigma, window_size):
+    def make_tracks(self, verbose, smooth, sigma, window_size, min_part, fields):
         """
         This function creates or loads the halo tracks for the simulation.
 
         Parameters:
         verbose (bool): Whether to print progress messages.
         sigma (float): Scatter to apply to vmax.
+        min_part (int): Drop tracks that never exceed this many particles.
+        fields (iterable of str): Track fields to build.
         Returns:
         tracks (dict): A dictionary containing the halo tracks.
         """
 
-        if smooth:
-            file = f'{self.path}/{self.sim_name}_S{str(sigma).replace(".", "p")}_W{window_size}_tracks_smoothed.npy'
-        else:
-            file = f'{self.path}/{self.sim_name}_S{str(sigma).replace(".", "p")}_W{window_size}_tracks.npy'
+        file = f'{self.path}/{self.sim_name}_S{str(sigma).replace(".", "p")}_W{window_size}_P{min_part}'
+        if set(fields) != set(mkt.DEFAULT_FIELDS):
+            file += '_F' + hashlib.md5(','.join(sorted(fields)).encode()).hexdigest()[:8]
+        file += '_tracks_smoothed.npy' if smooth else '_tracks.npy'
 
         if os.path.exists(file):
             if verbose: print(f'Loading tracks from {file}')
             self.tracks = np.load(file, allow_pickle=True).item()
         else:
             if verbose: print(f'Creating tracks and saving to {file}')
-            self.tracks = mkt.mk_track(self.snapshot, path=self.path, 
+            self.tracks = mkt.mk_track(self.snapshot, fields=fields, path=self.path, 
                                   verbose=verbose, 
                                   bins=1,
                                   sigma=sigma,
-                                  window_size=window_size)
+                                  window_size=window_size,
+                                  min_part=min_part)
             
             np.save(file, self.tracks, allow_pickle=True)
         
